@@ -41,6 +41,8 @@ import {
   type Wallet,
 } from "@/lib/finance/types";
 
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
+
 function createEmptyFinanceDataset(): FinanceDataset {
   return {
     wallets: [],
@@ -174,37 +176,76 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       return;
     }
-
-    const unsubscribeAuth = subscribeToAuthState((nextUser) => {
-      setAuthUser(nextUser);
-      setAuthReady(true);
-      setAuthError(null);
-
-      if (!nextUser) {
-        clearUser();
+    let isDisposed = false;
+    const timeoutId = window.setTimeout(() => {
+      if (isDisposed) {
         return;
       }
 
-      activateUser(nextUser.uid, createEmptyFinanceDataset());
-
-      void (async () => {
-        try {
-          await upsertUserProfile(nextUser.uid, {
-            uid: nextUser.uid,
-            email: nextUser.email,
-            displayName: nextUser.displayName,
-            photoURL: nextUser.photoURL,
-          });
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Failed to initialize Firebase profile.";
-          setAuthError(message);
-          setSyncStatus("error", message);
+      setAuthReady((current) => {
+        if (current) {
+          return current;
         }
-      })();
-    });
 
-    return unsubscribeAuth;
+        setAuthError(
+          "Authentication is taking longer than expected. Please try sign-in again.",
+        );
+        return true;
+      });
+    }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
+    let unsubscribeAuth: () => void = () => undefined;
+
+    try {
+      unsubscribeAuth = subscribeToAuthState((nextUser) => {
+        if (isDisposed) {
+          return;
+        }
+
+        window.clearTimeout(timeoutId);
+        setAuthUser(nextUser);
+        setAuthReady(true);
+        setAuthError(null);
+
+        if (!nextUser) {
+          clearUser();
+          return;
+        }
+
+        activateUser(nextUser.uid, createEmptyFinanceDataset());
+
+        void (async () => {
+          try {
+            await upsertUserProfile(nextUser.uid, {
+              uid: nextUser.uid,
+              email: nextUser.email,
+              displayName: nextUser.displayName,
+              photoURL: nextUser.photoURL,
+            });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to initialize Firebase profile.";
+            setAuthError(message);
+            setSyncStatus("error", message);
+          }
+        })();
+      });
+    } catch (error) {
+      window.clearTimeout(timeoutId);
+      const message =
+        error instanceof Error ? error.message : "Failed to initialize Firebase authentication.";
+      setAuthError(message);
+      setSyncStatus("error", message);
+      setAuthReady(true);
+      clearUser();
+      return;
+    }
+
+    return () => {
+      isDisposed = true;
+      window.clearTimeout(timeoutId);
+      unsubscribeAuth();
+    };
   }, [activateUser, clearUser, sessionDate, setSyncStatus]);
 
   useEffect(() => {
