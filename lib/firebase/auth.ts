@@ -1,8 +1,14 @@
 import {
   GoogleAuthProvider,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  getRedirectResult,
+  inMemoryPersistence,
   onAuthStateChanged,
-  signInWithPopup,
+  setPersistence,
+  signInWithRedirect,
   signOut,
+  type Auth,
   type User,
 } from "firebase/auth";
 import { isFirebaseConfigured, requireAuth } from "@/lib/firebase/client";
@@ -21,13 +27,41 @@ export function subscribeToAuthState(
   return onAuthStateChanged(requireAuth(), callback);
 }
 
-export async function signInWithGoogle(): Promise<User> {
+async function setBestAuthPersistence(auth: Auth): Promise<void> {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    return;
+  } catch {
+    // Fall through to session persistence.
+  }
+
+  try {
+    await setPersistence(auth, browserSessionPersistence);
+    return;
+  } catch {
+    // Fall through to in-memory persistence.
+  }
+
+  await setPersistence(auth, inMemoryPersistence);
+}
+
+export async function resolveRedirectSignInResult(): Promise<User | null> {
+  if (!isFirebaseConfigured) {
+    return null;
+  }
+
+  const result = await getRedirectResult(requireAuth());
+  return result?.user ?? null;
+}
+
+export async function signInWithGoogle(): Promise<void> {
   if (!isFirebaseConfigured) {
     throw new Error("Firebase is not configured for sign-in.");
   }
 
-  const result = await signInWithPopup(requireAuth(), googleProvider);
-  return result.user;
+  const auth = requireAuth();
+  await setBestAuthPersistence(auth);
+  await signInWithRedirect(auth, googleProvider);
 }
 
 export async function signOutCurrentUser(): Promise<void> {

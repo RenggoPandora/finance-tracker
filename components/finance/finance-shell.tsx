@@ -36,6 +36,7 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
     authError,
     syncStatus,
     syncError,
+    isFirebaseConfigured,
     isDemoMode,
     showAuthGate,
     signIn,
@@ -63,28 +64,19 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
   const currentLabel =
     activeMenu?.label ?? pathname.split("/").filter(Boolean).slice(-1)[0] ?? "Dashboard";
 
-  if (!authReady) {
-    return (
-      <div className="relative min-h-screen overflow-x-clip">
-        <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 sm:px-6 lg:px-8">
-          <section className="glass-panel w-full p-8 text-center">
-            <p className="chip mx-auto w-fit">Bootstrapping</p>
-            <h1 className="mt-4 text-2xl font-semibold">Loading finance workspace...</h1>
-          </section>
-        </main>
-      </div>
-    );
-  }
+  const shouldShowAuthGate = showAuthGate || (isFirebaseConfigured && !authReady);
 
-  if (showAuthGate) {
+  if (shouldShowAuthGate) {
     return (
       <div className="relative min-h-screen overflow-x-clip">
         <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 sm:px-6 lg:px-8">
           <section className="glass-panel w-full space-y-4 p-8 text-center">
-            <p className="chip mx-auto w-fit">Firebase Auth</p>
+            <p className="chip mx-auto w-fit">{authReady ? "Firebase Auth" : "Bootstrapping"}</p>
             <h1 className="text-2xl font-semibold">Sign in to access your workspace</h1>
             <p className="text-sm text-(--ink-muted)">
-              Your data syncs securely to Firestore.
+              {authReady
+                ? "Your data syncs securely to Firestore."
+                : "Initializing secure Firebase session. If this takes too long, continue with sign-in."}
             </p>
             <button
               type="button"
@@ -95,6 +87,14 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
               {authBusy ? "Processing..." : "Sign in with Google"}
             </button>
             {authError ? <p className="text-sm text-(--over)">{authError}</p> : null}
+            {!authReady ? (
+              <a
+                href={pathname}
+                className="inline-flex rounded-xl border border-(--line) bg-white px-4 py-2 text-xs font-semibold text-(--ink-muted)"
+              >
+                Reload Page
+              </a>
+            ) : null}
           </section>
         </main>
       </div>

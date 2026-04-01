@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   type BudgetMode,
   type FinanceDataset,
@@ -13,6 +13,32 @@ import {
 export const LOCAL_DEMO_UID = "local-demo";
 
 type SyncStatus = "idle" | "loading" | "ready" | "error";
+
+function createSafeLocalStorage(): StateStorage {
+  return {
+    getItem: (name) => {
+      try {
+        return window.localStorage.getItem(name);
+      } catch {
+        return null;
+      }
+    },
+    setItem: (name, value) => {
+      try {
+        window.localStorage.setItem(name, value);
+      } catch {
+        // Ignore write failures (Safari private mode, quota issues, etc.).
+      }
+    },
+    removeItem: (name) => {
+      try {
+        window.localStorage.removeItem(name);
+      } catch {
+        // Ignore removal failures for restricted storage environments.
+      }
+    },
+  };
+}
 
 interface CachedUserFinance extends FinanceDataset {
   mode: BudgetMode;
@@ -337,7 +363,7 @@ export const useFinanceStore = create<FinanceStoreState>()(
     }),
     {
       name: "finance-tracker-user-cache-v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(createSafeLocalStorage),
       partialize: (state) => ({
         userCache: state.userCache,
       }),

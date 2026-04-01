@@ -10,7 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { type User } from "firebase/auth";
-import { signInWithGoogle, signOutCurrentUser, subscribeToAuthState } from "@/lib/firebase/auth";
+import {
+  resolveRedirectSignInResult,
+  signInWithGoogle,
+  signOutCurrentUser,
+  subscribeToAuthState,
+} from "@/lib/firebase/auth";
 import {
   addTransfer,
   addWallet,
@@ -42,6 +47,7 @@ import {
 } from "@/lib/finance/types";
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
+const SIGN_IN_REDIRECT_TIMEOUT_MS = 7000;
 
 function createEmptyFinanceDataset(): FinanceDataset {
   return {
@@ -197,6 +203,15 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
     let unsubscribeAuth: () => void = () => undefined;
 
     try {
+      void resolveRedirectSignInResult().catch((error) => {
+        if (isDisposed) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : "Failed to complete Google sign-in redirect.";
+        setAuthError(message);
+      });
       unsubscribeAuth = subscribeToAuthState((nextUser) => {
         if (isDisposed) {
           return;
@@ -301,11 +316,19 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
     setAuthBusy(true);
     setAuthError(null);
 
+    const fallbackId = window.setTimeout(() => {
+      setAuthBusy(false);
+      setAuthError(
+        "Google sign-in redirect was blocked. Try again or open this page in Safari/Chrome.",
+      );
+    }, SIGN_IN_REDIRECT_TIMEOUT_MS);
+
     try {
       await signInWithGoogle();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
     } finally {
+      window.clearTimeout(fallbackId);
       setAuthBusy(false);
     }
   }, []);
