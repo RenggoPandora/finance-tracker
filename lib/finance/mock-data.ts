@@ -151,7 +151,7 @@ export function createMockFinanceDataset(referenceDate = new Date()): FinanceDat
       date: date(17),
       walletId: "w-save-a",
       isPersonalSpending: true,
-      note: "Kebutuhan rumah",
+      note: "Household needs",
     },
   ] as const;
 

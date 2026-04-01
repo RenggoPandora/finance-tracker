@@ -99,6 +99,16 @@ function transferDocument(uid: string, transferId: string) {
   );
 }
 
+function goalDocument(uid: string, goalId: string) {
+  return doc(
+    requireFirestore(),
+    FIRESTORE_COLLECTIONS.users,
+    uid,
+    FIRESTORE_COLLECTIONS.goals,
+    goalId,
+  );
+}
+
 function addBalanceDelta(
   deltaMap: Map<string, number>,
   walletId: string,
@@ -111,7 +121,7 @@ function parsePositiveAmount(value: unknown): number {
   const amount = Number(value);
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error("Nominal transfer tidak valid.");
+    throw new Error("Transfer amount is invalid.");
   }
 
   return amount;
@@ -127,11 +137,11 @@ function extractTransferCore(value: Partial<Transfer>): {
   const amount = parsePositiveAmount(value.amount);
 
   if (!fromWalletId || !toWalletId) {
-    throw new Error("Data transfer tidak valid.");
+    throw new Error("Transfer data is invalid.");
   }
 
   if (fromWalletId === toWalletId) {
-    throw new Error("Wallet asal dan tujuan harus berbeda.");
+    throw new Error("Source and destination wallets must be different.");
   }
 
   return {
@@ -162,18 +172,18 @@ async function applyWalletBalanceDeltas(
   const nextBalances = walletsToUpdate.map(({ walletId, walletRef }, index) => {
     const walletSnapshot = snapshots[index];
     if (!walletSnapshot || !walletSnapshot.exists()) {
-      throw new Error("Wallet transfer tidak ditemukan.");
+      throw new Error("Transfer wallet was not found.");
     }
 
     const currentBalance = Number(walletSnapshot.data().balance);
     if (!Number.isFinite(currentBalance)) {
-      throw new Error("Data saldo wallet tidak valid.");
+      throw new Error("Wallet balance data is invalid.");
     }
 
     const delta = deltas.get(walletId) ?? 0;
     const nextBalance = currentBalance + delta;
     if (nextBalance < 0) {
-      throw new Error("Saldo wallet asal tidak cukup untuk transfer.");
+      throw new Error("Insufficient source wallet balance for transfer.");
     }
 
     return { walletRef, nextBalance };
@@ -342,11 +352,11 @@ export async function addTransaction(
 ): Promise<string> {
   const amount = Number(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error("Nominal transaksi tidak valid.");
+    throw new Error("Transaction amount is invalid.");
   }
 
   if (!input.walletId) {
-    throw new Error("Wallet transaksi wajib dipilih.");
+    throw new Error("A transaction wallet is required.");
   }
 
   const walletRef = walletDocument(uid, input.walletId);
@@ -356,17 +366,17 @@ export async function addTransaction(
   await runTransaction(requireFirestore(), async (transaction) => {
     const walletSnapshot = await transaction.get(walletRef);
     if (!walletSnapshot.exists()) {
-      throw new Error("Wallet transaksi tidak ditemukan.");
+      throw new Error("Transaction wallet was not found.");
     }
 
     const currentBalance = Number(walletSnapshot.data().balance);
     if (!Number.isFinite(currentBalance)) {
-      throw new Error("Data saldo wallet tidak valid.");
+      throw new Error("Wallet balance data is invalid.");
     }
 
     const nextBalance = currentBalance + walletDelta;
     if (nextBalance < 0) {
-      throw new Error("Saldo wallet tidak cukup untuk transaksi expense.");
+      throw new Error("Insufficient wallet balance for this expense.");
     }
 
     transaction.update(walletRef, {
@@ -477,6 +487,27 @@ export async function deleteWallet(uid: string, walletId: string): Promise<void>
   await deleteDoc(walletRef);
 }
 
+export async function updateGoal(
+  uid: string,
+  goalId: string,
+  updates: Partial<Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
+): Promise<void> {
+  const goalRef = goalDocument(uid, goalId);
+
+  await updateDoc(
+    goalRef,
+    compactObject({
+      ...updates,
+      updatedAt: serverTimestamp(),
+    }),
+  );
+}
+
+export async function deleteGoal(uid: string, goalId: string): Promise<void> {
+  const goalRef = goalDocument(uid, goalId);
+  await deleteDoc(goalRef);
+}
+
 export async function updateTransfer(
   uid: string,
   transferId: string,
@@ -487,7 +518,7 @@ export async function updateTransfer(
   await runTransaction(requireFirestore(), async (transaction) => {
     const transferSnapshot = await transaction.get(transferRef);
     if (!transferSnapshot.exists()) {
-      throw new Error("Transfer tidak ditemukan.");
+      throw new Error("Transfer was not found.");
     }
 
     const currentTransfer = extractTransferCore(transferSnapshot.data() as Partial<Transfer>);
@@ -522,7 +553,7 @@ export async function deleteTransfer(uid: string, transferId: string): Promise<v
   await runTransaction(requireFirestore(), async (transaction) => {
     const transferSnapshot = await transaction.get(transferRef);
     if (!transferSnapshot.exists()) {
-      throw new Error("Transfer tidak ditemukan.");
+      throw new Error("Transfer was not found.");
     }
 
     const currentTransfer = extractTransferCore(transferSnapshot.data() as Partial<Transfer>);

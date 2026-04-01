@@ -54,6 +54,11 @@ interface FinanceStoreState extends FinanceDataset {
     updates: Partial<Omit<RoutineExpense, "id">>,
   ) => void;
   prependGoal: (goal: Goal) => void;
+  updateGoal: (
+    goalId: string,
+    updates: Partial<Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
+  ) => void;
+  removeGoal: (goalId: string) => void;
   prependTransfer: (transfer: Transfer) => void;
   updateTransfer: (
     transferId: string,
@@ -280,6 +285,23 @@ export const useFinanceStore = create<FinanceStoreState>()(
             left.deadline.localeCompare(right.deadline),
           );
 
+          return withCollectionUpdate(state, { goals });
+        });
+      },
+
+      updateGoal: (goalId, updates) => {
+        set((state) => {
+          const goals = state.goals
+            .map((goal) => (goal.id === goalId ? { ...goal, ...updates } : goal))
+            .sort((left, right) => left.deadline.localeCompare(right.deadline));
+
+          return withCollectionUpdate(state, { goals });
+        });
+      },
+
+      removeGoal: (goalId) => {
+        set((state) => {
+          const goals = state.goals.filter((goal) => goal.id !== goalId);
           return withCollectionUpdate(state, { goals });
         });
       },

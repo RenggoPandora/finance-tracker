@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -40,19 +41,19 @@ const cashflowRangeMeta: Record<
   }
 > = {
   weekly: {
-    title: "Mingguan",
-    periodLabel: "Minggu Ini",
-    scopeLabel: "7 hari terakhir",
+    title: "Weekly",
+    periodLabel: "This Week",
+    scopeLabel: "last 7 days",
   },
   monthly: {
-    title: "Bulanan",
-    periodLabel: "Bulan Ini",
-    scopeLabel: "bulan berjalan",
+    title: "Monthly",
+    periodLabel: "This Month",
+    scopeLabel: "current month",
   },
   yearly: {
-    title: "Tahunan",
-    periodLabel: "12 Bulan",
-    scopeLabel: "12 bulan terakhir",
+    title: "Yearly",
+    periodLabel: "Last 12 Months",
+    scopeLabel: "last 12 months",
   },
 };
 
@@ -100,7 +101,7 @@ export default function DashboardPage() {
   const [cashflowRange, setCashflowRange] = useState<CashflowRange>("monthly");
 
   const budgetStatus = budgetStatusMeta[snapshot.budgetHealth.status];
-  const dashboardTransactions = recentTransactions.slice(0, 8);
+  const dashboardTransactions = recentTransactions.slice(0, 40);
   const selectedRangeMeta = cashflowRangeMeta[cashflowRange];
 
   const cashflowTracker = useMemo(() => {
@@ -251,14 +252,14 @@ export default function DashboardPage() {
           <p className="mt-2 text-xl font-semibold sm:text-2xl">
             {formatCurrency(snapshot.totalBalance)}
           </p>
-          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">Saldo aktual dari seluruh wallet</p>
+          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">Current balance across wallets</p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Projected Balance</p>
           <p className="mt-2 text-xl font-semibold text-(--warning) sm:text-2xl">
             {formatCurrency(snapshot.projectedBalance)}
           </p>
-          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">Setelah semua planned routine</p>
+          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">After all planned routines</p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Available Money</p>
@@ -266,13 +267,13 @@ export default function DashboardPage() {
             {formatCurrency(snapshot.availableMoney)}
           </p>
           <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">
-            Kebutuhan hidup - pengeluaran dari wallet sumber limit.
+            Living funds minus expenses from source wallets.
           </p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Discipline Score</p>
           <p className="mt-2 text-xl font-semibold sm:text-2xl">{snapshot.disciplineScore}/100</p>
-          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">{snapshot.streakDays} hari streak hemat</p>
+          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">{snapshot.streakDays}-day discipline streak</p>
         </article>
       </section>
 
@@ -281,7 +282,7 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-xl font-semibold">Wallet Snapshot</h2>
             <p className="text-sm text-(--ink-muted)">
-              Distribusi saldo per wallet untuk monitoring alokasi dana.
+              Balance distribution across wallets.
             </p>
           </div>
           <p className="text-sm font-semibold text-(--ink-muted)">
@@ -300,7 +301,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-semibold">{formatCurrency(wallet.balance)}</p>
               </div>
               <p className="mt-1 text-xs uppercase tracking-wide text-(--ink-soft)">
-                {Math.round(wallet.share * 100)}% dari total saldo
+                {Math.round(wallet.share * 100)}% of total balance
               </p>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-(--line)">
                 <div
@@ -318,8 +319,8 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-xl font-semibold">Cashflow Tracker</h2>
             <p className="text-sm text-(--ink-muted)">
-              Style market chart untuk membaca momentum net worth, zona flow, dan sinyal activity
-              pada {selectedRangeMeta.scopeLabel}.
+              Market-style chart for net worth momentum, flow zones, and activity signals over
+              {` ${selectedRangeMeta.scopeLabel}`}.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-xs font-semibold text-[#90abcb]">
@@ -415,7 +416,7 @@ export default function DashboardPage() {
                     return (
                       <div className="min-w-44 rounded-xl border border-[#2b3e57] bg-[#0a1320]/95 px-3 py-2 text-xs text-[#d7e8fb] shadow-xl">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#93adcd]">
-                          Tanggal {label}
+                          Date {label}
                         </p>
                         <p className="mt-1 flex items-center justify-between gap-3">
                           <span>Income</span>
@@ -507,12 +508,20 @@ export default function DashboardPage() {
       <section className="glass-panel p-5 sm:p-6">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold">Recent Transactions</h2>
-          <p className="text-sm text-(--ink-muted)">Ringkasan income dan expense terbaru.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-(--ink-muted)">Latest income and expense activity.</p>
+            <Link
+              href="/all-transactions"
+              className="rounded-xl border border-(--line) bg-white px-3 py-1.5 text-xs font-semibold text-(--ink-muted) hover:bg-(--surface-solid)"
+            >
+              View All
+            </Link>
+          </div>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 h-[24rem] space-y-3 overflow-y-auto pr-1 sm:h-[30rem]">
           {dashboardTransactions.length === 0 ? (
-            <p className="text-sm text-(--ink-muted)">Belum ada transaksi.</p>
+            <p className="text-sm text-(--ink-muted)">No transactions yet.</p>
           ) : (
             dashboardTransactions.map((transaction) => {
               const isIncome = transaction.type === "income";
@@ -539,7 +548,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <p className="mt-2 text-xs uppercase tracking-wide text-(--ink-soft)">
-                    {transaction.isPersonalSpending ? "Personal spending" : "Non personal"}
+                    {transaction.isPersonalSpending ? "Personal spending" : "Non-personal"}
                   </p>
                 </article>
               );
@@ -553,12 +562,12 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-xl font-semibold">Smart Spending Limit</h2>
             <p className="text-sm text-(--ink-muted)">
-              Adaptive budgeting dengan mode strict atau flexible carry-forward.
+              Adaptive budgeting with strict and flexible carry-forward modes.
             </p>
             <p className="mt-1 text-xs text-(--ink-soft)">
               {snapshot.isSpendingLimitWalletSelectionActive
-                ? `Sumber limit: ${snapshot.spendingLimitSourceWalletCount} wallet kebutuhan hidup (${formatCurrency(snapshot.spendingLimitSourceBalance)}).`
-                : "Belum ada wallet kebutuhan hidup yang dicentang, sehingga limit sementara memakai total saldo semua wallet."}
+                ? `Spending source: ${snapshot.spendingLimitSourceWalletCount} wallet(s) (${formatCurrency(snapshot.spendingLimitSourceBalance)}).`
+                : "No spending source selected. Limit currently uses all wallet balances."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -591,11 +600,11 @@ export default function DashboardPage() {
         <div className="mt-4 grid gap-5 lg:grid-cols-[1.5fr_1fr]">
           <div className="space-y-4 rounded-2xl border border-(--line) bg-(--surface-solid) p-4">
             <div className="flex items-center justify-between text-sm">
-              <p className="text-(--ink-muted)">Spending personal hari ini</p>
+              <p className="text-(--ink-muted)">Today&apos;s personal spending</p>
               <p className="font-semibold">{formatCurrency(snapshot.todayPersonalSpending)}</p>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <p className="text-(--ink-muted)">Batas aman hari ini</p>
+              <p className="text-(--ink-muted)">Today&apos;s safe limit</p>
               <p className="font-semibold">{formatCurrency(snapshot.dailySafeBudget)}</p>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-(--line)">
@@ -613,7 +622,7 @@ export default function DashboardPage() {
               <dd className="mt-1 font-semibold">{formatCurrency(snapshot.dailySafeBudget)}</dd>
             </div>
             <div className="metric-card">
-              <dt className="stat-label">Pengeluaran Bulan Ini</dt>
+              <dt className="stat-label">Monthly Expenses</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(snapshot.spendingLimitExpenses)}</dd>
             </div>
             <div className="metric-card">
@@ -622,7 +631,7 @@ export default function DashboardPage() {
             </div>
             <div className="metric-card">
               <dt className="stat-label">Remaining Days</dt>
-              <dd className="mt-1 font-semibold">{snapshot.remainingDays} hari</dd>
+              <dd className="mt-1 font-semibold">{snapshot.remainingDays} days</dd>
             </div>
             <div className="metric-card">
               <dt className="stat-label">Locked Goals</dt>

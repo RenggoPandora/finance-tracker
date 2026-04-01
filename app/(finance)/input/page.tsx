@@ -21,7 +21,7 @@ export default function InputPage() {
       <div className="mb-4">
         <h2 className="text-xl font-semibold">Quick Input</h2>
         <p className="text-sm text-(--ink-muted)">
-          Form dipisah khusus untuk input transaksi, routine expense, dan goal dengan cepat.
+          Fast forms for transactions, routine expenses, and goals.
         </p>
       </div>
 

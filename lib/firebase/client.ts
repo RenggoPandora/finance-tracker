@@ -50,7 +50,7 @@ export { firebaseApp, firebaseAuth, firestoreDb };
 export function requireFirestore(): Firestore {
   if (!firestoreDb) {
     throw new Error(
-      "Firebase Firestore belum dikonfigurasi. Tambahkan NEXT_PUBLIC_FIREBASE_* pada .env.local.",
+      "Firebase Firestore is not configured. Add NEXT_PUBLIC_FIREBASE_* to .env.local.",
     );
   }
 
@@ -60,7 +60,7 @@ export function requireFirestore(): Firestore {
 export function requireAuth(): Auth {
   if (!firebaseAuth) {
     throw new Error(
-      "Firebase Auth belum dikonfigurasi. Tambahkan NEXT_PUBLIC_FIREBASE_* pada .env.local.",
+      "Firebase Auth is not configured. Add NEXT_PUBLIC_FIREBASE_* to .env.local.",
     );
   }
 

@@ -23,7 +23,7 @@ export function subscribeToAuthState(
 
 export async function signInWithGoogle(): Promise<User> {
   if (!isFirebaseConfigured) {
-    throw new Error("Firebase belum dikonfigurasi untuk login.");
+    throw new Error("Firebase is not configured for sign-in.");
   }
 
   const result = await signInWithPopup(requireAuth(), googleProvider);

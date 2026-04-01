@@ -45,7 +45,7 @@ export default function RoutinePage() {
 
     const plannedAmount = Number(editPlannedAmount);
     if (!Number.isFinite(plannedAmount) || plannedAmount <= 0) {
-      setStatusMessage("Estimasi harga routine harus lebih dari 0.");
+      setStatusMessage("Routine estimate must be greater than 0.");
       return;
     }
 
@@ -63,9 +63,9 @@ export default function RoutinePage() {
       });
 
       setEditingRoutineId(null);
-      setStatusMessage("Routine berhasil diperbarui.");
+      setStatusMessage("Routine updated.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal memperbarui routine.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to update routine.");
     } finally {
       setIsSubmitting(false);
     }
@@ -77,24 +77,24 @@ export default function RoutinePage() {
         <div>
           <h2 className="text-xl font-semibold">Routine Expenses</h2>
           <p className="text-sm text-(--ink-muted)">
-            Planned vs actual bulanan. Status dan estimasi bisa diubah manual lewat Edit.
+            Monthly planned vs actual. Status and estimate are edited manually.
           </p>
         </div>
-        <span className="chip">{formatPercent(routineCompletion)} selesai</span>
+        <span className="chip">{formatPercent(routineCompletion)} completed</span>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <article className="metric-card">
           <p className="stat-label">Real Balance</p>
           <p className="mt-1 text-lg font-semibold">{formatCurrency(snapshot.totalBalance)}</p>
-          <p className="mt-1 text-xs text-(--ink-muted)">Saldo aktual dari seluruh wallet.</p>
+          <p className="mt-1 text-xs text-(--ink-muted)">Current balance across wallets.</p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Projected Balance</p>
           <p className="mt-1 text-lg font-semibold text-(--warning)">
             {formatCurrency(snapshot.projectedBalance)}
           </p>
-          <p className="mt-1 text-xs text-(--ink-muted)">Estimasi saldo setelah planned routine.</p>
+          <p className="mt-1 text-xs text-(--ink-muted)">Estimated balance after planned routines.</p>
         </article>
       </div>
 
@@ -116,7 +116,7 @@ export default function RoutinePage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold">{item.name}</p>
                   <span className="text-xs text-(--ink-soft)">
-                    {item.dueDate ? `Due ${formatDate(item.dueDate)}` : "Tanpa due date"}
+                    {item.dueDate ? `Due ${formatDate(item.dueDate)}` : "No due date"}
                   </span>
                 </div>
 
@@ -125,7 +125,7 @@ export default function RoutinePage() {
                     value={editPlannedAmount}
                     onChange={(event) => setEditPlannedAmount(event.target.value)}
                     inputMode="numeric"
-                    placeholder="Estimasi harga"
+                    placeholder="Estimated amount"
                     className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                     disabled={formDisabled}
                   />
@@ -137,7 +137,7 @@ export default function RoutinePage() {
                     disabled={formDisabled}
                   >
                     <option value="planned">Planned</option>
-                    <option value="done">Selesai</option>
+                    <option value="done">Done</option>
                   </select>
                 </div>
 
@@ -147,7 +147,7 @@ export default function RoutinePage() {
                     disabled={formDisabled}
                     className="rounded-xl bg-(--accent) px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Simpan Perubahan
+                    Save Changes
                   </button>
                   <button
                     type="button"
@@ -155,7 +155,7 @@ export default function RoutinePage() {
                     disabled={isSubmitting}
                     className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Batal
+                    Cancel
                   </button>
                 </div>
               </form>
@@ -195,10 +195,10 @@ export default function RoutinePage() {
 
       {statusMessage ? <p className="mt-4 text-sm text-(--ink-muted)">{statusMessage}</p> : null}
       {!uid ? (
-        <p className="mt-2 text-sm text-(--over)">Login dulu untuk mengubah routine.</p>
+        <p className="mt-2 text-sm text-(--over)">Sign in to edit routines.</p>
       ) : null}
       {syncStatus === "loading" ? (
-        <p className="mt-2 text-xs text-(--ink-soft)">Sedang sinkronisasi data routine...</p>
+        <p className="mt-2 text-xs text-(--ink-soft)">Syncing routine data...</p>
       ) : null}
     </section>
   );

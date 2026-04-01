@@ -18,7 +18,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Personal Finance OS",
   description:
-    "Dashboard keuangan pribadi dengan routine planned vs actual, adaptive spending limit, dan financial goals.",
+    "Personal finance dashboard with planned vs actual routines, adaptive spending limits, and financial goals.",
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="id"
+      lang="en"
       className={`${sora.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

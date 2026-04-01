@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type NewGoalInput,
   type NewRoutineExpenseInput,
@@ -35,10 +35,11 @@ export default function QuickEntryPanel({
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const txSubmitLockedRef = useRef(false);
 
   const [txAmount, setTxAmount] = useState("");
   const [txType, setTxType] = useState<"income" | "expense">("expense");
-  const [txCategory, setTxCategory] = useState("Makanan");
+  const [txCategory, setTxCategory] = useState("Food");
   const [txWalletId, setTxWalletId] = useState(fallbackWalletId);
   const [txPersonal, setTxPersonal] = useState(true);
 
@@ -46,7 +47,7 @@ export default function QuickEntryPanel({
   const [routinePlanned, setRoutinePlanned] = useState("");
   const [routineDueDate, setRoutineDueDate] = useState(isoDateOffset(2));
 
-  const [goalName, setGoalName] = useState("Dana Darurat");
+  const [goalName, setGoalName] = useState("Emergency Fund");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalDeadline, setGoalDeadline] = useState(isoDateOffset(30));
   const [goalWalletId, setGoalWalletId] = useState(fallbackWalletId);
@@ -85,12 +86,17 @@ export default function QuickEntryPanel({
   async function handleTransactionSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const amount = Number(txAmount);
-    if (!Number.isFinite(amount) || amount <= 0 || !txWalletId) {
-      setStatusMessage("Nominal transaksi dan wallet harus valid.");
+    if (txSubmitLockedRef.current) {
       return;
     }
 
+    const amount = Number(txAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || !txWalletId) {
+      setStatusMessage("Enter a valid amount and wallet.");
+      return;
+    }
+
+    txSubmitLockedRef.current = true;
     setIsSubmitting(true);
     setStatusMessage(null);
 
@@ -105,11 +111,12 @@ export default function QuickEntryPanel({
       });
 
       setTxAmount("");
-      setStatusMessage("Transaksi berhasil disimpan.");
+      setStatusMessage("Transaction saved.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menyimpan transaksi.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to save transaction.");
     } finally {
       setIsSubmitting(false);
+      txSubmitLockedRef.current = false;
     }
   }
 
@@ -118,7 +125,7 @@ export default function QuickEntryPanel({
 
     const plannedAmount = Number(routinePlanned);
     if (!Number.isFinite(plannedAmount) || plannedAmount <= 0) {
-      setStatusMessage("Nominal routine expense harus valid.");
+      setStatusMessage("Enter a valid routine amount.");
       return;
     }
 
@@ -134,9 +141,9 @@ export default function QuickEntryPanel({
       });
 
       setRoutinePlanned("");
-      setStatusMessage("Routine expense berhasil ditambahkan.");
+      setStatusMessage("Routine expense added.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menambah routine.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to add routine.");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,7 +154,7 @@ export default function QuickEntryPanel({
 
     const targetAmount = Number(goalTarget);
     if (!Number.isFinite(targetAmount) || targetAmount <= 0 || !goalWalletId) {
-      setStatusMessage("Target goal dan wallet harus valid.");
+      setStatusMessage("Enter a valid goal target and wallet.");
       return;
     }
 
@@ -156,7 +163,7 @@ export default function QuickEntryPanel({
 
     try {
       await onCreateGoal({
-        name: goalName.trim() || "Goal Baru",
+        name: goalName.trim() || "New Goal",
         targetAmount,
         deadline: goalDeadline,
         currentSaved: 0,
@@ -164,9 +171,9 @@ export default function QuickEntryPanel({
       });
 
       setGoalTarget("");
-      setStatusMessage("Goal berhasil dibuat.");
+      setStatusMessage("Goal created.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menambah goal.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to create goal.");
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +188,7 @@ export default function QuickEntryPanel({
             <input
               value={txAmount}
               onChange={(event) => setTxAmount(event.target.value)}
-              placeholder="Nominal"
+              placeholder="Amount"
               inputMode="numeric"
               className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
               disabled={formDisabled}
@@ -199,7 +206,7 @@ export default function QuickEntryPanel({
           <input
             value={txCategory}
             onChange={(event) => setTxCategory(event.target.value)}
-            placeholder="Kategori"
+            placeholder="Category"
             className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
             disabled={formDisabled}
           />
@@ -231,7 +238,7 @@ export default function QuickEntryPanel({
             disabled={formDisabled}
             className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Simpan Transaksi
+            Save Transaction
           </button>
         </form>
 
@@ -240,7 +247,7 @@ export default function QuickEntryPanel({
           <input
             value={routineName}
             onChange={(event) => setRoutineName(event.target.value)}
-            placeholder="Nama routine"
+            placeholder="Routine name"
             className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
             disabled={formDisabled}
           />
@@ -264,7 +271,7 @@ export default function QuickEntryPanel({
             disabled={formDisabled}
             className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Tambah Routine
+            Add Routine
           </button>
         </form>
 
@@ -273,7 +280,7 @@ export default function QuickEntryPanel({
           <input
             value={goalName}
             onChange={(event) => setGoalName(event.target.value)}
-            placeholder="Nama goal"
+            placeholder="Goal name"
             className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
             disabled={formDisabled}
           />
@@ -311,11 +318,11 @@ export default function QuickEntryPanel({
             disabled={formDisabled || !hasGoalWalletOption}
             className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Buat Goal
+            Create Goal
           </button>
           {!hasGoalWalletOption ? (
             <p className="text-xs text-(--warning)">
-              Semua wallet sudah dipakai goal. Tambah wallet baru untuk membuat goal lain.
+              All wallets are already linked to goals. Add another wallet to create a new goal.
             </p>
           ) : null}
         </form>
@@ -323,11 +330,11 @@ export default function QuickEntryPanel({
 
       <p className="text-sm text-(--ink-muted)">
         {statusMessage ??
-          "Quick input dirancang untuk input inti transaksi, routine, dan goal dalam beberapa detik."}
+          "Quick entry for transactions, routines, and goals."}
       </p>
       {!hasWallets ? (
         <p className="text-sm text-(--warning)">
-          Tambahkan minimal satu wallet agar quick input aktif.
+          Add at least one wallet to enable quick entry.
         </p>
       ) : null}
     </section>

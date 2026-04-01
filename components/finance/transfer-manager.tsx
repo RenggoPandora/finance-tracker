@@ -13,7 +13,7 @@ function todayIsoDate(): string {
 function parseTransferAmount(value: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error("Nominal transfer harus lebih dari 0.");
+    throw new Error("Transfer amount must be greater than 0.");
   }
 
   return parsed;
@@ -189,17 +189,17 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     event.preventDefault();
 
     if (!hasEnoughWallets) {
-      setErrorStatus("Minimal dua wallet dibutuhkan untuk transfer.");
+      setErrorStatus("At least two wallets are required for transfers.");
       return;
     }
 
     if (!fromWalletId || !toWalletId) {
-      setErrorStatus("Pilih wallet asal dan tujuan transfer.");
+      setErrorStatus("Select source and destination wallets.");
       return;
     }
 
     if (fromWalletId === toWalletId) {
-      setErrorStatus("Wallet asal dan tujuan harus berbeda.");
+      setErrorStatus("Source and destination wallets must be different.");
       return;
     }
 
@@ -219,9 +219,9 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       setAmount("");
       setNote("");
       setDate(todayIsoDate());
-      setSuccessStatus("Transfer berhasil ditambahkan.");
+      setSuccessStatus("Transfer added.");
     } catch (error) {
-      setErrorStatus(error instanceof Error ? error.message : "Gagal menambah transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Failed to add transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -254,7 +254,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     event.preventDefault();
 
     if (editFromWalletId === editToWalletId) {
-      setErrorStatus("Wallet asal dan tujuan harus berbeda.");
+      setErrorStatus("Source and destination wallets must be different.");
       return;
     }
 
@@ -272,9 +272,9 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       });
 
       setEditingTransferId(null);
-      setSuccessStatus("Transfer berhasil diperbarui.");
+      setSuccessStatus("Transfer updated.");
     } catch (error) {
-      setErrorStatus(error instanceof Error ? error.message : "Gagal memperbarui transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Failed to update transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -289,7 +289,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
   async function handleDeleteTransfer(transferId: string): Promise<void> {
     const target = transferMap[transferId];
     const confirmation = window.confirm(
-      `Hapus transfer ${target ? formatCurrency(target.amount) : "ini"}?`,
+      `Delete transfer ${target ? formatCurrency(target.amount) : "this item"}?`,
     );
 
     if (!confirmation) {
@@ -301,9 +301,9 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       clearStatus();
       await deleteTransfer(transferId);
       setEditingTransferId((current) => (current === transferId ? null : current));
-      setSuccessStatus("Transfer berhasil dihapus.");
+      setSuccessStatus("Transfer deleted.");
     } catch (error) {
-      setErrorStatus(error instanceof Error ? error.message : "Gagal menghapus transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Failed to delete transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -311,13 +311,13 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
   return (
     <section className="glass-panel p-5 sm:p-6">
-      <h2 className="text-xl font-semibold">Transfer Antar Wallet</h2>
+      <h2 className="text-xl font-semibold">Wallet Transfers</h2>
       <p className="mt-1 text-sm text-(--ink-muted)">
-        Buat, ubah, dan hapus transfer. Transfer tidak dihitung sebagai income atau expense.
+        Create, edit, and delete transfers. Transfers are excluded from income and expense totals.
       </p>
       {preferredTargetWalletName ? (
         <p className="mt-1 text-xs text-(--accent-deep)">
-          Target wallet goal dipilih otomatis: {preferredTargetWalletName}
+          Goal wallet selected automatically: {preferredTargetWalletName}
         </p>
       ) : null}
       {statusMessage ? (
@@ -332,7 +332,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[340px_1fr]">
         <form onSubmit={handleCreateTransfer} className="metric-card space-y-3">
-          <p className="text-sm font-semibold">Tambah Transfer</p>
+          <p className="text-sm font-semibold">Add Transfer</p>
 
           <div className="grid gap-2 sm:grid-cols-2">
             <select
@@ -365,7 +365,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
           <input
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            placeholder="Nominal transfer"
+            placeholder="Transfer amount"
             inputMode="numeric"
             className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
             disabled={formDisabled || !hasEnoughWallets}
@@ -382,7 +382,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
           <input
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="Catatan (opsional)"
+            placeholder="Note (optional)"
             className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
             disabled={formDisabled || !hasEnoughWallets}
           />
@@ -392,12 +392,12 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
             disabled={submitDisabled}
             className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Simpan Transfer
+            Save Transfer
           </button>
 
           {!hasEnoughWallets ? (
             <p className="text-xs text-(--warning)">
-              Tambahkan minimal 2 wallet sebelum membuat transfer.
+              Add at least 2 wallets before creating a transfer.
             </p>
           ) : null}
         </form>
@@ -408,7 +408,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Cari note, wallet, nominal, atau tanggal"
+                placeholder="Search by note, wallet, amount, or date"
                 className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                 disabled={formDisabled}
               />
@@ -418,7 +418,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                 className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                 disabled={formDisabled}
               >
-                <option value="all">Semua Wallet</option>
+                <option value="all">All Wallets</option>
                 {dataset.wallets.map((wallet) => (
                   <option key={wallet.id} value={wallet.id}>
                     {wallet.name}
@@ -433,10 +433,10 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                 className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                 disabled={formDisabled}
               >
-                <option value="all">Semua Periode</option>
-                <option value="7d">7 Hari Terakhir</option>
-                <option value="30d">30 Hari Terakhir</option>
-                <option value="this-month">Bulan Ini</option>
+                <option value="all">All Time</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="this-month">This Month</option>
               </select>
               <button
                 type="button"
@@ -448,16 +448,16 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
               </button>
             </div>
             <p className="text-xs text-(--ink-soft)">
-              Menampilkan {filteredTransfers.length} dari {recentTransfers.length} transfer.
+              Showing {filteredTransfers.length} of {recentTransfers.length} transfers.
             </p>
           </div>
 
           <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
             {recentTransfers.length === 0 ? (
-              <p className="text-sm text-(--ink-muted)">Belum ada transfer.</p>
+              <p className="text-sm text-(--ink-muted)">No transfers yet.</p>
             ) : filteredTransfers.length === 0 ? (
               <p className="text-sm text-(--ink-muted)">
-                Tidak ada transfer yang cocok dengan filter atau kata pencarian.
+                No transfers match the selected filters.
               </p>
             ) : (
               filteredTransfers.map((transfer) => (
@@ -518,7 +518,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                       <input
                         value={editNote}
                         onChange={(event) => setEditNote(event.target.value)}
-                        placeholder="Catatan"
+                        placeholder="Note"
                         className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                         disabled={formDisabled}
                       />
@@ -529,7 +529,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                           disabled={formDisabled}
                           className="rounded-xl bg-(--accent) px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Simpan Perubahan
+                          Save Changes
                         </button>
                         <button
                           type="button"
@@ -537,7 +537,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                           disabled={isSubmitting}
                           className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Batal
+                          Cancel
                         </button>
                       </div>
                     </form>
@@ -553,11 +553,11 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <span className="rounded-full bg-(--over-soft) px-2.5 py-1 text-xs font-semibold text-(--over)">
-                          -{formatCurrency(transfer.amount)} dari{" "}
+                          -{formatCurrency(transfer.amount)} from{" "}
                           {walletNameById[transfer.fromWalletId] ?? transfer.fromWalletId}
                         </span>
                         <span className="rounded-full bg-(--safe-soft) px-2.5 py-1 text-xs font-semibold text-(--safe)">
-                          +{formatCurrency(transfer.amount)} ke{" "}
+                          +{formatCurrency(transfer.amount)} to{" "}
                           {walletNameById[transfer.toWalletId] ?? transfer.toWalletId}
                         </span>
                       </div>
@@ -580,7 +580,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
                           disabled={formDisabled}
                           className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--over) disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Hapus
+                          Delete
                         </button>
                       </div>
                     </>
@@ -593,10 +593,10 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       </div>
 
       {!uid ? (
-        <p className="mt-2 text-sm text-(--over)">Login dulu untuk mengelola transfer.</p>
+        <p className="mt-2 text-sm text-(--over)">Sign in to manage transfers.</p>
       ) : null}
       {syncStatus === "loading" ? (
-        <p className="mt-2 text-xs text-(--ink-soft)">Sedang sinkronisasi data transfer...</p>
+        <p className="mt-2 text-xs text-(--ink-soft)">Syncing transfer data...</p>
       ) : null}
     </section>
   );

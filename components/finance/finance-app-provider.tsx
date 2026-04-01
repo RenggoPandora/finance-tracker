@@ -17,9 +17,11 @@ import {
   addGoal,
   addRoutineExpense,
   addTransaction,
+  deleteGoal,
   deleteTransfer,
   deleteWallet,
   subscribeToFinanceCollections,
+  updateGoal,
   updateRoutineExpense,
   updateTransfer,
   updateWallet,
@@ -66,7 +68,7 @@ function applyWalletDeltas(wallets: Wallet[], deltas: Map<string, number>): Wall
 
   for (const walletId of deltas.keys()) {
     if (!availableWalletIds.has(walletId)) {
-      throw new Error("Wallet transfer tidak ditemukan.");
+      throw new Error("Transfer wallet was not found.");
     }
   }
 
@@ -78,7 +80,7 @@ function applyWalletDeltas(wallets: Wallet[], deltas: Map<string, number>): Wall
 
     const nextBalance = wallet.balance + delta;
     if (nextBalance < 0) {
-      throw new Error("Saldo wallet asal tidak cukup untuk transfer.");
+      throw new Error("Insufficient source wallet balance for transfer.");
     }
 
     return {
@@ -118,6 +120,11 @@ interface FinanceAppContextValue {
     updates: Partial<Pick<RoutineExpense, "plannedAmount" | "isDone" | "actualAmount" | "actualDate">>,
   ) => Promise<void>;
   createGoal: (payload: NewGoalInput) => Promise<void>;
+  updateGoal: (
+    goalId: string,
+    updates: Partial<Pick<NewGoalInput, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
+  ) => Promise<void>;
+  deleteGoal: (goalId: string) => Promise<void>;
 }
 
 const FinanceAppContext = createContext<FinanceAppContextValue | null>(null);
@@ -154,6 +161,8 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const prependRoutineExpense = useFinanceStore((state) => state.prependRoutineExpense);
   const updateRoutineExpenseInStore = useFinanceStore((state) => state.updateRoutineExpense);
   const prependGoal = useFinanceStore((state) => state.prependGoal);
+  const updateGoalInStore = useFinanceStore((state) => state.updateGoal);
+  const removeGoalFromStore = useFinanceStore((state) => state.removeGoal);
   const prependTransfer = useFinanceStore((state) => state.prependTransfer);
   const updateTransferInStore = useFinanceStore((state) => state.updateTransfer);
   const removeTransferFromStore = useFinanceStore((state) => state.removeTransfer);
@@ -188,7 +197,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
           });
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : "Gagal menyiapkan profile Firebase.";
+            error instanceof Error ? error.message : "Failed to initialize Firebase profile.";
           setAuthError(message);
           setSyncStatus("error", message);
         }
@@ -254,7 +263,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithGoogle();
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Gagal login dengan Google.");
+      setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
     } finally {
       setAuthBusy(false);
     }
@@ -267,7 +276,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
     try {
       await signOutCurrentUser();
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Gagal logout.");
+      setAuthError(error instanceof Error ? error.message : "Sign-out failed.");
     } finally {
       setAuthBusy(false);
     }
@@ -276,18 +285,18 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const createWallet = useCallback(
     async (payload: NewWalletInput): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menambah wallet.");
+        throw new Error("Sign in before adding a wallet.");
       }
 
       const name = payload.name.trim();
       const balance = Number(payload.balance);
 
       if (!name) {
-        throw new Error("Nama wallet wajib diisi.");
+        throw new Error("Wallet name is required.");
       }
 
       if (!Number.isFinite(balance)) {
-        throw new Error("Saldo wallet harus berupa angka valid.");
+        throw new Error("Wallet balance must be a valid number.");
       }
 
       const nextPayload: NewWalletInput = {
@@ -310,7 +319,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const updateWalletEntry = useCallback(
     async (walletId: string, updates: Partial<NewWalletInput>): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum mengubah wallet.");
+        throw new Error("Sign in before updating a wallet.");
       }
 
       const nextUpdates: Partial<NewWalletInput> = {};
@@ -318,7 +327,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       if (updates.name !== undefined) {
         const nextName = updates.name.trim();
         if (!nextName) {
-          throw new Error("Nama wallet wajib diisi.");
+          throw new Error("Wallet name is required.");
         }
         nextUpdates.name = nextName;
       }
@@ -330,7 +339,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       if (updates.balance !== undefined) {
         const nextBalance = Number(updates.balance);
         if (!Number.isFinite(nextBalance)) {
-          throw new Error("Saldo wallet harus berupa angka valid.");
+          throw new Error("Wallet balance must be a valid number.");
         }
         nextUpdates.balance = nextBalance;
       }
@@ -356,11 +365,11 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const deleteWalletEntry = useCallback(
     async (walletId: string): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menghapus wallet.");
+        throw new Error("Sign in before deleting a wallet.");
       }
 
       if (wallets.length <= 1) {
-        throw new Error("Minimal satu wallet harus tersedia.");
+        throw new Error("At least one wallet must remain.");
       }
 
       const usedByTransaction = transactions.some((transaction) => transaction.walletId === walletId);
@@ -371,7 +380,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
 
       if (usedByTransaction || usedByGoal || usedByTransfer) {
         throw new Error(
-          "Wallet masih dipakai oleh transaksi, goals, atau transfers. Pindahkan datanya dulu.",
+          "This wallet is still used by transactions, goals, or transfers. Reassign related data first.",
         );
       }
 
@@ -388,21 +397,21 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const createTransfer = useCallback(
     async (payload: NewTransferInput): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menambah transfer.");
+        throw new Error("Sign in before creating a transfer.");
       }
 
       const amount = Number(payload.amount);
 
       if (!payload.fromWalletId || !payload.toWalletId) {
-        throw new Error("Wallet asal dan tujuan wajib dipilih.");
+        throw new Error("Source and destination wallets are required.");
       }
 
       if (payload.fromWalletId === payload.toWalletId) {
-        throw new Error("Wallet asal dan tujuan harus berbeda.");
+        throw new Error("Source and destination wallets must be different.");
       }
 
       if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error("Nominal transfer harus lebih dari 0.");
+        throw new Error("Transfer amount must be greater than 0.");
       }
 
       const nextPayload: NewTransferInput = {
@@ -428,26 +437,26 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const updateTransferEntry = useCallback(
     async (transferId: string, updates: Partial<NewTransferInput>): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum mengubah transfer.");
+        throw new Error("Sign in before updating a transfer.");
       }
 
       const currentTransfer = transfers.find((transfer) => transfer.id === transferId);
       if (!currentTransfer) {
-        throw new Error("Transfer tidak ditemukan.");
+        throw new Error("Transfer was not found.");
       }
 
       const nextFrom = updates.fromWalletId ?? currentTransfer.fromWalletId;
       const nextTo = updates.toWalletId ?? currentTransfer.toWalletId;
 
       if (nextFrom && nextTo && nextFrom === nextTo) {
-        throw new Error("Wallet asal dan tujuan harus berbeda.");
+        throw new Error("Source and destination wallets must be different.");
       }
 
       const nextAmount =
         updates.amount !== undefined ? Number(updates.amount) : currentTransfer.amount;
 
       if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
-        throw new Error("Nominal transfer harus lebih dari 0.");
+        throw new Error("Transfer amount must be greater than 0.");
       }
 
       const nextUpdates: Partial<NewTransferInput> = {};
@@ -496,12 +505,12 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const deleteTransferEntry = useCallback(
     async (transferId: string): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menghapus transfer.");
+        throw new Error("Sign in before deleting a transfer.");
       }
 
       const currentTransfer = transfers.find((transfer) => transfer.id === transferId);
       if (!currentTransfer) {
-        throw new Error("Transfer tidak ditemukan.");
+        throw new Error("Transfer was not found.");
       }
 
       if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
@@ -522,21 +531,21 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const createTransaction = useCallback(
     async (payload: NewTransactionInput): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menambah transaksi.");
+        throw new Error("Sign in before creating a transaction.");
       }
 
       const amount = Number(payload.amount);
       if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error("Nominal transaksi harus lebih dari 0.");
+        throw new Error("Transaction amount must be greater than 0.");
       }
 
       if (!payload.walletId) {
-        throw new Error("Wallet transaksi wajib dipilih.");
+        throw new Error("A transaction wallet is required.");
       }
 
       const targetWallet = wallets.find((wallet) => wallet.id === payload.walletId);
       if (!targetWallet) {
-        throw new Error("Wallet transaksi tidak ditemukan.");
+        throw new Error("Transaction wallet was not found.");
       }
 
       const nextPayload: NewTransactionInput = {
@@ -550,7 +559,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
         const nextBalance = targetWallet.balance + walletDelta;
 
         if (nextBalance < 0) {
-          throw new Error("Saldo wallet tidak cukup untuk transaksi expense.");
+          throw new Error("Insufficient wallet balance for this expense.");
         }
 
         setWallets(
@@ -571,7 +580,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const createRoutineExpense = useCallback(
     async (payload: NewRoutineExpenseInput): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menambah routine.");
+        throw new Error("Sign in before creating a routine.");
       }
 
       if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
@@ -592,12 +601,12 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       >,
     ): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum mengubah routine.");
+        throw new Error("Sign in before updating a routine.");
       }
 
       const currentRoutine = routineExpenses.find((routineExpense) => routineExpense.id === routineExpenseId);
       if (!currentRoutine) {
-        throw new Error("Routine tidak ditemukan.");
+        throw new Error("Routine item was not found.");
       }
 
       const nextUpdates: Partial<
@@ -607,7 +616,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       if (updates.plannedAmount !== undefined) {
         const plannedAmount = Number(updates.plannedAmount);
         if (!Number.isFinite(plannedAmount) || plannedAmount <= 0) {
-          throw new Error("Estimasi harga routine harus lebih dari 0.");
+          throw new Error("Routine estimate must be greater than 0.");
         }
         nextUpdates.plannedAmount = plannedAmount;
       }
@@ -619,7 +628,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       if (updates.actualAmount !== undefined) {
         const actualAmount = Number(updates.actualAmount);
         if (!Number.isFinite(actualAmount) || actualAmount < 0) {
-          throw new Error("Nominal actual routine tidak valid.");
+          throw new Error("Routine actual amount is invalid.");
         }
         nextUpdates.actualAmount = actualAmount;
       }
@@ -645,12 +654,12 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const createGoal = useCallback(
     async (payload: NewGoalInput): Promise<void> => {
       if (!uid) {
-        throw new Error("Login dulu sebelum menambah goal.");
+        throw new Error("Sign in before creating a goal.");
       }
 
       const linkedWalletExists = wallets.some((wallet) => wallet.id === payload.linkedWalletId);
       if (!linkedWalletExists) {
-        throw new Error("Wallet untuk goal tidak ditemukan.");
+        throw new Error("Goal wallet was not found.");
       }
 
       const linkedWalletAlreadyUsed = goals.some(
@@ -658,7 +667,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       );
       if (linkedWalletAlreadyUsed) {
         throw new Error(
-          "Wallet ini sudah dipakai goal lain. Gunakan wallet berbeda agar alokasi goal jelas.",
+          "This wallet is already linked to another goal. Use a different wallet.",
         );
       }
 
@@ -675,6 +684,103 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       await addGoal(uid, nextGoal);
     },
     [uid, wallets, goals, prependGoal],
+  );
+
+  const updateGoalEntry = useCallback(
+    async (
+      goalId: string,
+      updates: Partial<
+        Pick<NewGoalInput, "name" | "targetAmount" | "deadline" | "linkedWalletId">
+      >,
+    ): Promise<void> => {
+      if (!uid) {
+        throw new Error("Sign in before updating a goal.");
+      }
+
+      const currentGoal = goals.find((goal) => goal.id === goalId);
+      if (!currentGoal) {
+        throw new Error("Goal was not found.");
+      }
+
+      const nextUpdates: Partial<
+        Pick<NewGoalInput, "name" | "targetAmount" | "deadline" | "linkedWalletId">
+      > = {};
+
+      if (updates.name !== undefined) {
+        const nextName = updates.name.trim();
+        if (!nextName) {
+          throw new Error("Goal name is required.");
+        }
+        nextUpdates.name = nextName;
+      }
+
+      if (updates.targetAmount !== undefined) {
+        const nextTargetAmount = Number(updates.targetAmount);
+        if (!Number.isFinite(nextTargetAmount) || nextTargetAmount <= 0) {
+          throw new Error("Goal target must be greater than 0.");
+        }
+        nextUpdates.targetAmount = nextTargetAmount;
+      }
+
+      if (updates.deadline !== undefined) {
+        const nextDeadline = updates.deadline.trim();
+        if (!nextDeadline) {
+          throw new Error("Goal deadline is required.");
+        }
+        nextUpdates.deadline = nextDeadline;
+      }
+
+      if (updates.linkedWalletId !== undefined) {
+        const linkedWalletExists = wallets.some((wallet) => wallet.id === updates.linkedWalletId);
+        if (!linkedWalletExists) {
+          throw new Error("Goal wallet was not found.");
+        }
+
+        const linkedWalletAlreadyUsed = goals.some(
+          (goal) => goal.id !== goalId && goal.linkedWalletId === updates.linkedWalletId,
+        );
+        if (linkedWalletAlreadyUsed) {
+          throw new Error(
+            "This wallet is already linked to another goal. Use a different wallet.",
+          );
+        }
+
+        nextUpdates.linkedWalletId = updates.linkedWalletId;
+      }
+
+      if (Object.keys(nextUpdates).length === 0) {
+        return;
+      }
+
+      if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
+        updateGoalInStore(goalId, nextUpdates);
+        return;
+      }
+
+      await updateGoal(uid, goalId, nextUpdates);
+    },
+    [uid, goals, wallets, updateGoalInStore],
+  );
+
+  const deleteGoalEntry = useCallback(
+    async (goalId: string): Promise<void> => {
+      if (!uid) {
+        throw new Error("Sign in before deleting a goal.");
+      }
+
+      const currentGoal = goals.find((goal) => goal.id === goalId);
+      if (!currentGoal) {
+        throw new Error("Goal was not found.");
+      }
+
+      if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
+        removeGoalFromStore(goalId);
+        return;
+      }
+
+      await deleteGoal(uid, goalId);
+    },
+    [uid, goals, removeGoalFromStore],
   );
 
   const isDemoMode = !isFirebaseConfigured || uid === LOCAL_DEMO_UID;
@@ -706,6 +812,8 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       createRoutineExpense,
       updateRoutineExpense: updateRoutineExpenseEntry,
       createGoal,
+      updateGoal: updateGoalEntry,
+      deleteGoal: deleteGoalEntry,
     }),
     [
       uid,
@@ -731,6 +839,8 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       createRoutineExpense,
       updateRoutineExpenseEntry,
       createGoal,
+      updateGoalEntry,
+      deleteGoalEntry,
     ],
   );
 
@@ -741,7 +851,7 @@ export function useFinanceAppContext(): FinanceAppContextValue {
   const context = useContext(FinanceAppContext);
 
   if (!context) {
-    throw new Error("useFinanceAppContext harus dipakai di dalam FinanceAppProvider.");
+    throw new Error("useFinanceAppContext must be used within FinanceAppProvider.");
   }
 
   return context;

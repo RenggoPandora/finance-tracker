@@ -18,7 +18,7 @@ const walletTypeOptions: Array<{ value: WalletType; label: string }> = [
 function parseBalance(value: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    throw new Error("Saldo wallet harus berupa angka valid.");
+    throw new Error("Wallet balance must be a valid number.");
   }
 
   return parsed;
@@ -57,7 +57,7 @@ export default function WalletsPage() {
 
     const name = newName.trim();
     if (!name) {
-      setStatusMessage("Nama wallet wajib diisi.");
+      setStatusMessage("Wallet name is required.");
       return;
     }
 
@@ -76,9 +76,9 @@ export default function WalletsPage() {
       setNewName("");
       setNewBalance("");
       setNewIsSpendingLimitSource(false);
-      setStatusMessage("Wallet berhasil ditambahkan.");
+      setStatusMessage("Wallet added.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menambah wallet.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to add wallet.");
     } finally {
       setIsSubmitting(false);
     }
@@ -109,7 +109,7 @@ export default function WalletsPage() {
 
     const name = editName.trim();
     if (!name) {
-      setStatusMessage("Nama wallet wajib diisi.");
+      setStatusMessage("Wallet name is required.");
       return;
     }
 
@@ -126,9 +126,9 @@ export default function WalletsPage() {
       });
 
       setEditingWalletId(null);
-      setStatusMessage("Wallet berhasil diperbarui.");
+      setStatusMessage("Wallet updated.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal memperbarui wallet.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to update wallet.");
     } finally {
       setIsSubmitting(false);
     }
@@ -137,7 +137,7 @@ export default function WalletsPage() {
   async function handleDeleteWallet(walletId: string): Promise<void> {
     const target = walletMap[walletId];
     const confirmation = window.confirm(
-      `Hapus wallet ${target?.name ?? "ini"}? Tindakan ini tidak bisa dibatalkan.`,
+      `Delete wallet ${target?.name ?? "this wallet"}? This action cannot be undone.`,
     );
 
     if (!confirmation) {
@@ -149,9 +149,9 @@ export default function WalletsPage() {
       setStatusMessage(null);
       await deleteWallet(walletId);
       setEditingWalletId((current) => (current === walletId ? null : current));
-      setStatusMessage("Wallet berhasil dihapus.");
+      setStatusMessage("Wallet deleted.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menghapus wallet.");
+      setStatusMessage(error instanceof Error ? error.message : "Failed to delete wallet.");
     } finally {
       setIsSubmitting(false);
     }
@@ -162,28 +162,27 @@ export default function WalletsPage() {
       <section className="glass-panel p-5 sm:p-6">
         <h2 className="text-xl font-semibold">Wallet Management</h2>
         <p className="mt-1 text-sm text-(--ink-muted)">
-          Kelola saldo wallet dan transfer antar wallet dari satu menu terintegrasi.
+          Manage wallet balances and transfers in one place.
         </p>
         {snapshot.isSpendingLimitWalletSelectionActive ? (
           <p className="mt-2 text-xs text-(--ink-soft)">
-            Wallet kebutuhan hidup dipilih: {snapshot.spendingLimitSourceWalletCount} wallet
+            Spending limit source: {snapshot.spendingLimitSourceWalletCount} wallet(s)
             ({formatCurrency(snapshot.spendingLimitSourceBalance)}).
           </p>
         ) : (
           <p className="mt-2 text-xs text-(--warning)">
-            Belum ada checklist wallet kebutuhan hidup. Limit spending sementara memakai semua
-            wallet.
+            No spending source selected. Limit currently uses all wallets.
           </p>
         )}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[320px_1fr]">
           <form onSubmit={handleCreateWallet} className="metric-card space-y-3">
-            <p className="text-sm font-semibold">Tambah Wallet Baru</p>
+            <p className="text-sm font-semibold">Add Wallet</p>
 
             <input
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
-              placeholder="Nama wallet"
+              placeholder="Wallet name"
               className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
               disabled={formDisabled}
             />
@@ -204,7 +203,7 @@ export default function WalletsPage() {
               <input
                 value={newBalance}
                 onChange={(event) => setNewBalance(event.target.value)}
-                placeholder="Saldo awal"
+                placeholder="Opening balance"
                 inputMode="numeric"
                 className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
                 disabled={formDisabled}
@@ -218,7 +217,7 @@ export default function WalletsPage() {
                 onChange={(event) => setNewIsSpendingLimitSource(event.target.checked)}
                 disabled={formDisabled}
               />
-              Gunakan wallet ini untuk kebutuhan hidup (penentu limit spending)
+              Use this wallet for living expenses (spending limit source)
             </label>
 
             <button
@@ -226,7 +225,7 @@ export default function WalletsPage() {
               disabled={formDisabled}
               className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Simpan Wallet
+              Save Wallet
             </button>
           </form>
 
@@ -277,7 +276,7 @@ export default function WalletsPage() {
                         onChange={(event) => setEditIsSpendingLimitSource(event.target.checked)}
                         disabled={formDisabled}
                       />
-                      Gunakan wallet ini untuk kebutuhan hidup (penentu limit spending)
+                      Use this wallet for living expenses (spending limit source)
                     </label>
 
                     <div className="flex flex-wrap gap-2">
@@ -286,7 +285,7 @@ export default function WalletsPage() {
                         disabled={formDisabled}
                         className="rounded-xl bg-(--accent) px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Simpan Perubahan
+                        Save Changes
                       </button>
                       <button
                         type="button"
@@ -294,7 +293,7 @@ export default function WalletsPage() {
                         disabled={isSubmitting}
                         className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Batal
+                        Cancel
                       </button>
                     </div>
                   </form>
@@ -308,7 +307,7 @@ export default function WalletsPage() {
                         </span>
                         {wallet.isSpendingLimitSource ? (
                           <span className="ml-2 rounded-full bg-(--safe-soft) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-(--safe)">
-                            Kebutuhan Hidup
+                            Living
                           </span>
                         ) : null}
                       </p>
@@ -337,7 +336,7 @@ export default function WalletsPage() {
                         disabled={formDisabled || !canDeleteWallet}
                         className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--over) disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Hapus
+                        Delete
                       </button>
                     </div>
                   </>
@@ -347,13 +346,13 @@ export default function WalletsPage() {
 
             {snapshot.walletDistribution.length === 0 ? (
               <p className="text-sm text-(--ink-muted)">
-                Belum ada wallet. Tambahkan wallet pertama untuk mulai tracking saldo.
+                No wallets yet. Add your first wallet to start tracking balances.
               </p>
             ) : null}
 
             {!canDeleteWallet ? (
               <p className="text-xs text-(--ink-soft)">
-                Minimal satu wallet harus tetap tersedia di akun.
+                At least one wallet must remain.
               </p>
             ) : null}
           </div>
@@ -363,10 +362,10 @@ export default function WalletsPage() {
           <p className="mt-4 text-sm text-(--ink-muted)">{statusMessage}</p>
         ) : null}
         {!uid ? (
-          <p className="mt-2 text-sm text-(--over)">Login dulu untuk mengelola wallet.</p>
+          <p className="mt-2 text-sm text-(--over)">Sign in to manage wallets.</p>
         ) : null}
         {syncStatus === "loading" ? (
-          <p className="mt-2 text-xs text-(--ink-soft)">Sedang sinkronisasi data wallet...</p>
+          <p className="mt-2 text-xs text-(--ink-soft)">Syncing wallet data...</p>
         ) : null}
       </section>
 

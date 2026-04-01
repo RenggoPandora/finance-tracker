@@ -9,9 +9,14 @@ const menuItems = [
   {
     href: "/dashboard",
     label: "Dashboard",
-    activePrefixes: ["/dashboard", "/transactions"],
+    activePrefixes: ["/dashboard"],
   },
-  { href: "/input", label: "Input Cepat", activePrefixes: ["/input"] },
+  {
+    href: "/all-transactions",
+    label: "All Transactions",
+    activePrefixes: ["/all-transactions", "/transactions"],
+  },
+  { href: "/input", label: "Quick Entry", activePrefixes: ["/input"] },
   { href: "/routine", label: "Routine", activePrefixes: ["/routine"] },
   { href: "/goals", label: "Goals", activePrefixes: ["/goals"] },
   {
@@ -64,7 +69,7 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
         <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 sm:px-6 lg:px-8">
           <section className="glass-panel w-full p-8 text-center">
             <p className="chip mx-auto w-fit">Bootstrapping</p>
-            <h1 className="mt-4 text-2xl font-semibold">Memuat sesi finance tracker...</h1>
+            <h1 className="mt-4 text-2xl font-semibold">Loading finance workspace...</h1>
           </section>
         </main>
       </div>
@@ -77,9 +82,9 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
         <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 sm:px-6 lg:px-8">
           <section className="glass-panel w-full space-y-4 p-8 text-center">
             <p className="chip mx-auto w-fit">Firebase Auth</p>
-            <h1 className="text-2xl font-semibold">Login untuk akses menu keuangan</h1>
+            <h1 className="text-2xl font-semibold">Sign in to access your workspace</h1>
             <p className="text-sm text-(--ink-muted)">
-              Data akan disinkronkan per user ke Firestore setelah login.
+              Your data syncs securely to Firestore.
             </p>
             <button
               type="button"
@@ -87,7 +92,7 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
               disabled={authBusy}
               className="mx-auto rounded-xl bg-(--accent) px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {authBusy ? "Memproses..." : "Login dengan Google"}
+              {authBusy ? "Processing..." : "Sign in with Google"}
             </button>
             {authError ? <p className="text-sm text-(--over)">{authError}</p> : null}
           </section>
@@ -192,7 +197,7 @@ export default function FinanceShell({ children }: { children: React.ReactNode }
               </span>
               <span className="max-w-[13rem] truncate text-(--ink-muted) sm:max-w-none">
                 {isDemoMode
-                  ? "Mode demo lokal"
+                  ? "Local demo mode"
                   : authUser?.displayName ?? authUser?.email ?? "Unknown user"}
               </span>
               {!isDemoMode ? (

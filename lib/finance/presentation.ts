@@ -15,17 +15,17 @@ export const budgetStatusMeta: Record<
   }
 > = {
   safe: {
-    label: "Aman",
+    label: "Safe",
     chipClass: "bg-(--safe-soft) text-(--safe)",
     barClass: "bg-(--safe)",
   },
   warning: {
-    label: "Warning",
+    label: "Caution",
     chipClass: "bg-(--warning-soft) text-(--warning)",
     barClass: "bg-(--warning)",
   },
   over: {
-    label: "Over",
+    label: "Over Limit",
     chipClass: "bg-(--over-soft) text-(--over)",
     barClass: "bg-(--over)",
   },

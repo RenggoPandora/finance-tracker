@@ -42,7 +42,7 @@ function createBudgetHealth(todaySpending: number, safeLimit: number): BudgetHea
     return {
       status: "safe",
       pointsDelta: 8,
-      message: "Tidak ada ruang spending hari ini, dan kamu tetap disiplin.",
+      message: "No spending room today, and you stayed disciplined.",
     };
   }
 
@@ -50,7 +50,7 @@ function createBudgetHealth(todaySpending: number, safeLimit: number): BudgetHea
     return {
       status: "over",
       pointsDelta: -10,
-      message: "Saldo aman sudah habis. Prioritaskan kebutuhan wajib dulu.",
+      message: "Safe balance is depleted. Prioritize essentials first.",
     };
   }
 
@@ -58,7 +58,7 @@ function createBudgetHealth(todaySpending: number, safeLimit: number): BudgetHea
     return {
       status: "safe",
       pointsDelta: 8,
-      message: "Spending hari ini masih dalam batas aman.",
+      message: "Today's spending is within the safe limit.",
     };
   }
 
@@ -66,14 +66,14 @@ function createBudgetHealth(todaySpending: number, safeLimit: number): BudgetHea
     return {
       status: "warning",
       pointsDelta: -2,
-      message: "Sedikit melewati limit. Kurangi spending discretionary.",
+      message: "Slightly above limit. Reduce discretionary spending.",
     };
   }
 
   return {
     status: "over",
     pointsDelta: -10,
-    message: "Overspend tinggi. Perlu recovery plan untuk sisa bulan.",
+    message: "High overspend. Use a recovery plan for the rest of the month.",
   };
 }
 
