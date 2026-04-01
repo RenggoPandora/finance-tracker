@@ -6,6 +6,9 @@ import {
 } from "@/lib/finance/types";
 
 const WARNING_MULTIPLIER = 1.15;
+const MIN_STRICT_SAVINGS_RATE = 0.1;
+const MAX_STRICT_SAVINGS_RATE = 0.2;
+const DEFAULT_STRICT_SAVINGS_RATE = 0.15;
 
 function toDate(dateInput: string): Date {
   return new Date(`${dateInput}T00:00:00`);
@@ -86,6 +89,7 @@ export function calculateFinanceSnapshot({
   today = new Date(),
   mode = "flexible",
   softCapMultiplier = 2.2,
+  strictSavingsRate = DEFAULT_STRICT_SAVINGS_RATE,
 }: FinanceSnapshotInput): FinanceSnapshot {
   const referenceDay =
     typeof today === "string" ? startOfDay(toDate(today)) : startOfDay(today);
@@ -113,13 +117,6 @@ export function calculateFinanceSnapshot({
   const todayPersonalSpending = sumBy(
     personalTransactions.filter((transaction) =>
       isSameDay(toDate(transaction.date), referenceDay),
-    ),
-    (transaction) => transaction.amount,
-  );
-
-  const spentBeforeToday = sumBy(
-    personalTransactions.filter(
-      (transaction) => toDate(transaction.date).getTime() < referenceDay.getTime(),
     ),
     (transaction) => transaction.amount,
   );
@@ -176,20 +173,28 @@ export function calculateFinanceSnapshot({
   }, 0);
 
   const availableMoney = Math.max(0, spendingLimitSourceBalance - spendingLimitExpenses);
+  const normalizedStrictSavingsRate = clamp(
+    strictSavingsRate,
+    MIN_STRICT_SAVINGS_RATE,
+    MAX_STRICT_SAVINGS_RATE,
+  );
+  const strictSavingsAmount =
+    mode === "strict"
+      ? Math.max(0, spendingLimitSourceBalance * normalizedStrictSavingsRate)
+      : 0;
+  const spendingBudgetPool =
+    mode === "strict" ? Math.max(0, availableMoney - strictSavingsAmount) : availableMoney;
 
   const year = referenceDay.getFullYear();
   const month = referenceDay.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const dayOfMonth = referenceDay.getDate();
-  const elapsedDays = Math.max(0, dayOfMonth - 1);
   const remainingDays = Math.max(1, daysInMonth - dayOfMonth + 1);
 
-  const baseDailyBudget = Math.max(0, availableMoney / remainingDays);
+  const baseDailyBudget = Math.max(0, spendingBudgetPool / remainingDays);
 
-  const carryForwardBudgetRaw = Math.max(
-    0,
-    baseDailyBudget * elapsedDays - spentBeforeToday,
-  );
+  const carryForwardBudgetRaw =
+    mode === "flexible" ? Math.max(0, availableMoney - baseDailyBudget) : 0;
 
   const carryForwardBudget = mode === "flexible" ? carryForwardBudgetRaw : 0;
 
@@ -197,6 +202,7 @@ export function calculateFinanceSnapshot({
     mode === "strict"
       ? baseDailyBudget
       : Math.min(
+          availableMoney,
           baseDailyBudget + carryForwardBudgetRaw,
           baseDailyBudget * softCapMultiplier,
         );
@@ -293,6 +299,9 @@ export function calculateFinanceSnapshot({
     spendingLimitSourceWalletCount: spendingLimitSourceWallets.length,
     isSpendingLimitWalletSelectionActive,
     availableMoney,
+    strictSavingsRate: normalizedStrictSavingsRate,
+    strictSavingsAmount,
+    spendingBudgetPool,
     remainingDays,
     baseDailyBudget,
     carryForwardBudget,

@@ -569,6 +569,11 @@ export default function DashboardPage() {
                 ? `Spending source: ${snapshot.spendingLimitSourceWalletCount} wallet(s) (${formatCurrency(snapshot.spendingLimitSourceBalance)}).`
                 : "No spending source selected. Limit currently uses all wallet balances."}
             </p>
+            <p className="mt-1 text-xs text-(--ink-soft)">
+              {mode === "strict"
+                ? `Strict reserve active: ${Math.round(snapshot.strictSavingsRate * 100)}% (${formatCurrency(snapshot.strictSavingsAmount)}).`
+                : "Flexible mode: no fixed reserve is enforced."}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -628,6 +633,10 @@ export default function DashboardPage() {
             <div className="metric-card">
               <dt className="stat-label">Carry Forward</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(snapshot.carryForwardBudget)}</dd>
+            </div>
+            <div className="metric-card">
+              <dt className="stat-label">Strict Reserve</dt>
+              <dd className="mt-1 font-semibold">{formatCurrency(snapshot.strictSavingsAmount)}</dd>
             </div>
             <div className="metric-card">
               <dt className="stat-label">Remaining Days</dt>

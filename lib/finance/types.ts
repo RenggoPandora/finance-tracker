@@ -109,6 +109,9 @@ export interface FinanceSnapshot {
   spendingLimitSourceWalletCount: number;
   isSpendingLimitWalletSelectionActive: boolean;
   availableMoney: number;
+  strictSavingsRate: number;
+  strictSavingsAmount: number;
+  spendingBudgetPool: number;
   remainingDays: number;
   baseDailyBudget: number;
   carryForwardBudget: number;
@@ -126,4 +129,5 @@ export interface FinanceSnapshotInput extends FinanceDataset {
   today?: Date | string;
   mode?: BudgetMode;
   softCapMultiplier?: number;
+  strictSavingsRate?: number;
 }
