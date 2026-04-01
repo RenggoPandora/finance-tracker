@@ -265,7 +265,9 @@ export default function DashboardPage() {
           <p className="mt-2 text-xl font-semibold text-(--safe) sm:text-2xl">
             {formatCurrency(snapshot.availableMoney)}
           </p>
-          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">Setelah planned expense dan locked goals</p>
+          <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">
+            Kebutuhan hidup - pengeluaran dari wallet sumber limit.
+          </p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Discipline Score</p>
@@ -553,6 +555,11 @@ export default function DashboardPage() {
             <p className="text-sm text-(--ink-muted)">
               Adaptive budgeting dengan mode strict atau flexible carry-forward.
             </p>
+            <p className="mt-1 text-xs text-(--ink-soft)">
+              {snapshot.isSpendingLimitWalletSelectionActive
+                ? `Sumber limit: ${snapshot.spendingLimitSourceWalletCount} wallet kebutuhan hidup (${formatCurrency(snapshot.spendingLimitSourceBalance)}).`
+                : "Belum ada wallet kebutuhan hidup yang dicentang, sehingga limit sementara memakai total saldo semua wallet."}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -604,6 +611,10 @@ export default function DashboardPage() {
             <div className="metric-card">
               <dt className="stat-label">Daily Safe</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(snapshot.dailySafeBudget)}</dd>
+            </div>
+            <div className="metric-card">
+              <dt className="stat-label">Pengeluaran Bulan Ini</dt>
+              <dd className="mt-1 font-semibold">{formatCurrency(snapshot.spendingLimitExpenses)}</dd>
             </div>
             <div className="metric-card">
               <dt className="stat-label">Carry Forward</dt>

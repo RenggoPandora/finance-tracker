@@ -32,10 +32,34 @@ export function createMockFinanceDataset(referenceDate = new Date()): FinanceDat
   const date = (day: number): string => toIsoDate(year, month, Math.min(day, daysInMonth));
 
   const wallets = [
-    { id: "w-cash", name: "Cash", type: "cash", balance: 1_750_000 },
-    { id: "w-save-a", name: "Tabungan Utama", type: "savings", balance: 5_250_000 },
-    { id: "w-save-b", name: "Tabungan Liburan", type: "savings", balance: 2_400_000 },
-    { id: "w-invest", name: "Investasi", type: "investment", balance: 3_800_000 },
+    {
+      id: "w-cash",
+      name: "Cash",
+      type: "cash",
+      balance: 1_750_000,
+      isSpendingLimitSource: true,
+    },
+    {
+      id: "w-save-a",
+      name: "Tabungan Utama",
+      type: "savings",
+      balance: 5_250_000,
+      isSpendingLimitSource: true,
+    },
+    {
+      id: "w-save-b",
+      name: "Tabungan Liburan",
+      type: "savings",
+      balance: 2_400_000,
+      isSpendingLimitSource: false,
+    },
+    {
+      id: "w-invest",
+      name: "Investasi",
+      type: "investment",
+      balance: 3_800_000,
+      isSpendingLimitSource: false,
+    },
   ] as const;
 
   const transactions = [

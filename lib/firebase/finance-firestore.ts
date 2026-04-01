@@ -64,6 +64,13 @@ function mapSnapshotRows<T extends { id: string }>(
   });
 }
 
+function normalizeWallet(wallet: Wallet): Wallet {
+  return {
+    ...wallet,
+    isSpendingLimitSource: Boolean(wallet.isSpendingLimitSource),
+  };
+}
+
 function userDocument(uid: string) {
   return doc(requireFirestore(), FIRESTORE_COLLECTIONS.users, uid);
 }
@@ -139,15 +146,22 @@ async function applyWalletBalanceDeltas(
   transaction: FirestoreTransaction,
   deltas: Map<string, number>,
 ): Promise<void> {
-  for (const [walletId, delta] of deltas) {
-    if (delta === 0) {
-      continue;
-    }
+  const walletsToUpdate = Array.from(deltas.entries())
+    .filter(([, delta]) => delta !== 0)
+    .map(([walletId]) => ({ walletId, walletRef: walletDocument(uid, walletId) }));
 
-    const walletRef = walletDocument(uid, walletId);
-    const walletSnapshot = await transaction.get(walletRef);
+  if (walletsToUpdate.length === 0) {
+    return;
+  }
 
-    if (!walletSnapshot.exists()) {
+  // Firestore transactions require all reads to happen before writes.
+  const snapshots = await Promise.all(
+    walletsToUpdate.map(({ walletRef }) => transaction.get(walletRef)),
+  );
+
+  const nextBalances = walletsToUpdate.map(({ walletId, walletRef }, index) => {
+    const walletSnapshot = snapshots[index];
+    if (!walletSnapshot || !walletSnapshot.exists()) {
       throw new Error("Wallet transfer tidak ditemukan.");
     }
 
@@ -156,11 +170,16 @@ async function applyWalletBalanceDeltas(
       throw new Error("Data saldo wallet tidak valid.");
     }
 
+    const delta = deltas.get(walletId) ?? 0;
     const nextBalance = currentBalance + delta;
     if (nextBalance < 0) {
       throw new Error("Saldo wallet asal tidak cukup untuk transfer.");
     }
 
+    return { walletRef, nextBalance };
+  });
+
+  for (const { walletRef, nextBalance } of nextBalances) {
     transaction.update(walletRef, {
       balance: nextBalance,
       updatedAt: serverTimestamp(),
@@ -248,7 +267,8 @@ export function subscribeToFinanceCollections(
   unsubscribeList.push(
     onSnapshot(
       query(userCollection(uid, FIRESTORE_COLLECTIONS.wallets), orderBy("name", "asc")),
-      (snapshot) => callbacks.onWallets(mapSnapshotRows<Wallet>(snapshot)),
+      (snapshot) =>
+        callbacks.onWallets(mapSnapshotRows<Wallet>(snapshot).map(normalizeWallet)),
       onError,
     ),
   );
@@ -299,10 +319,15 @@ export function subscribeToFinanceCollections(
 }
 
 export async function addWallet(uid: string, input: NewWalletInput): Promise<string> {
+  const nextWallet: NewWalletInput = {
+    ...input,
+    isSpendingLimitSource: Boolean(input.isSpendingLimitSource),
+  };
+
   const result = await addDoc(
     userCollection(uid, FIRESTORE_COLLECTIONS.wallets),
     compactObject({
-      ...input,
+      ...nextWallet,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }),
@@ -315,16 +340,53 @@ export async function addTransaction(
   uid: string,
   input: NewTransactionInput,
 ): Promise<string> {
-  const result = await addDoc(
-    userCollection(uid, FIRESTORE_COLLECTIONS.transactions),
-    compactObject({
-      ...input,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }),
-  );
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Nominal transaksi tidak valid.");
+  }
 
-  return result.id;
+  if (!input.walletId) {
+    throw new Error("Wallet transaksi wajib dipilih.");
+  }
+
+  const walletRef = walletDocument(uid, input.walletId);
+  const transactionRef = doc(userCollection(uid, FIRESTORE_COLLECTIONS.transactions));
+  const walletDelta = input.type === "income" ? amount : -amount;
+
+  await runTransaction(requireFirestore(), async (transaction) => {
+    const walletSnapshot = await transaction.get(walletRef);
+    if (!walletSnapshot.exists()) {
+      throw new Error("Wallet transaksi tidak ditemukan.");
+    }
+
+    const currentBalance = Number(walletSnapshot.data().balance);
+    if (!Number.isFinite(currentBalance)) {
+      throw new Error("Data saldo wallet tidak valid.");
+    }
+
+    const nextBalance = currentBalance + walletDelta;
+    if (nextBalance < 0) {
+      throw new Error("Saldo wallet tidak cukup untuk transaksi expense.");
+    }
+
+    transaction.update(walletRef, {
+      balance: nextBalance,
+      updatedAt: serverTimestamp(),
+    });
+
+    transaction.set(
+      transactionRef,
+      compactObject({
+        ...input,
+        amount,
+        note: input.note?.trim() || undefined,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  return transactionRef.id;
 }
 
 export async function addRoutineExpense(
@@ -384,7 +446,7 @@ export async function addTransfer(uid: string, input: NewTransferInput): Promise
 export async function updateWallet(
   uid: string,
   walletId: string,
-  updates: Partial<Pick<Wallet, "name" | "type" | "balance">>,
+  updates: Partial<Pick<Wallet, "name" | "type" | "balance" | "isSpendingLimitSource">>,
 ): Promise<void> {
   const walletRef = doc(
     requireFirestore(),
@@ -477,7 +539,7 @@ export async function deleteTransfer(uid: string, transferId: string): Promise<v
 export async function updateRoutineExpense(
   uid: string,
   routineExpenseId: string,
-  updates: Partial<Pick<RoutineExpense, "isDone" | "actualAmount" | "actualDate">>,
+  updates: Partial<Pick<RoutineExpense, "plannedAmount" | "isDone" | "actualAmount" | "actualDate">>,
 ): Promise<void> {
   const routineRef = doc(
     requireFirestore(),

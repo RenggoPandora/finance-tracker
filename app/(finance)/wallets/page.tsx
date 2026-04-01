@@ -36,11 +36,13 @@ export default function WalletsPage() {
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<WalletType>("cash");
   const [newBalance, setNewBalance] = useState("");
+  const [newIsSpendingLimitSource, setNewIsSpendingLimitSource] = useState(false);
 
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState<WalletType>("cash");
   const [editBalance, setEditBalance] = useState("");
+  const [editIsSpendingLimitSource, setEditIsSpendingLimitSource] = useState(false);
 
   const formDisabled = !uid || syncStatus === "loading" || isSubmitting;
   const canDeleteWallet = dataset.wallets.length > 1;
@@ -68,10 +70,12 @@ export default function WalletsPage() {
         name,
         type: newType,
         balance,
+        isSpendingLimitSource: newIsSpendingLimitSource,
       });
 
       setNewName("");
       setNewBalance("");
+      setNewIsSpendingLimitSource(false);
       setStatusMessage("Wallet berhasil ditambahkan.");
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Gagal menambah wallet.");
@@ -85,6 +89,7 @@ export default function WalletsPage() {
     setEditName(wallet.name);
     setEditType(wallet.type);
     setEditBalance(String(wallet.balance));
+    setEditIsSpendingLimitSource(wallet.isSpendingLimitSource);
     setStatusMessage(null);
   }
 
@@ -92,6 +97,7 @@ export default function WalletsPage() {
     setEditingWalletId(null);
     setEditName("");
     setEditBalance("");
+    setEditIsSpendingLimitSource(false);
     setStatusMessage(null);
   }
 
@@ -116,6 +122,7 @@ export default function WalletsPage() {
         name,
         type: editType,
         balance,
+        isSpendingLimitSource: editIsSpendingLimitSource,
       });
 
       setEditingWalletId(null);
@@ -157,6 +164,17 @@ export default function WalletsPage() {
         <p className="mt-1 text-sm text-(--ink-muted)">
           Kelola saldo wallet dan transfer antar wallet dari satu menu terintegrasi.
         </p>
+        {snapshot.isSpendingLimitWalletSelectionActive ? (
+          <p className="mt-2 text-xs text-(--ink-soft)">
+            Wallet kebutuhan hidup dipilih: {snapshot.spendingLimitSourceWalletCount} wallet
+            ({formatCurrency(snapshot.spendingLimitSourceBalance)}).
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-(--warning)">
+            Belum ada checklist wallet kebutuhan hidup. Limit spending sementara memakai semua
+            wallet.
+          </p>
+        )}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[320px_1fr]">
           <form onSubmit={handleCreateWallet} className="metric-card space-y-3">
@@ -192,6 +210,16 @@ export default function WalletsPage() {
                 disabled={formDisabled}
               />
             </div>
+
+            <label className="flex items-center gap-2 rounded-xl border border-(--line) bg-white px-3 py-2 text-xs text-(--ink-muted)">
+              <input
+                type="checkbox"
+                checked={newIsSpendingLimitSource}
+                onChange={(event) => setNewIsSpendingLimitSource(event.target.checked)}
+                disabled={formDisabled}
+              />
+              Gunakan wallet ini untuk kebutuhan hidup (penentu limit spending)
+            </label>
 
             <button
               type="submit"
@@ -242,6 +270,16 @@ export default function WalletsPage() {
                       />
                     </div>
 
+                    <label className="flex items-center gap-2 rounded-xl border border-(--line) bg-white px-3 py-2 text-xs text-(--ink-muted)">
+                      <input
+                        type="checkbox"
+                        checked={editIsSpendingLimitSource}
+                        onChange={(event) => setEditIsSpendingLimitSource(event.target.checked)}
+                        disabled={formDisabled}
+                      />
+                      Gunakan wallet ini untuk kebutuhan hidup (penentu limit spending)
+                    </label>
+
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="submit"
@@ -268,6 +306,11 @@ export default function WalletsPage() {
                         <span className="ml-2 text-xs uppercase tracking-wide text-(--ink-soft)">
                           {walletTypeLabel[wallet.type]}
                         </span>
+                        {wallet.isSpendingLimitSource ? (
+                          <span className="ml-2 rounded-full bg-(--safe-soft) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-(--safe)">
+                            Kebutuhan Hidup
+                          </span>
+                        ) : null}
                       </p>
                       <p className="font-semibold">{formatCurrency(wallet.balance)}</p>
                     </div>

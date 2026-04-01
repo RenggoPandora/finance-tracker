@@ -8,6 +8,7 @@ export interface Wallet {
   name: string;
   type: WalletType;
   balance: number;
+  isSpendingLimitSource: boolean;
 }
 
 export interface Transaction {
@@ -103,6 +104,10 @@ export interface FinanceSnapshot {
   actualRoutineTotal: number;
   remainingPlannedExpenses: number;
   lockedGoals: number;
+  spendingLimitSourceBalance: number;
+  spendingLimitExpenses: number;
+  spendingLimitSourceWalletCount: number;
+  isSpendingLimitWalletSelectionActive: boolean;
   availableMoney: number;
   remainingDays: number;
   baseDailyBudget: number;

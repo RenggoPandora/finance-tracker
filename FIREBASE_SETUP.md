@@ -73,16 +73,22 @@ Catatan:
 
 File rules ada di `firestore.rules` dan mapping-nya ada di `firebase.json`.
 
-Install Firebase CLI (global, sekali saja):
+Opsi A (global, sekali saja):
 
 ```powershell
 npm install -g firebase-tools
 ```
 
-Login:
+Lalu login:
 
 ```powershell
 firebase login
+```
+
+Opsi B (tanpa install global, langsung via npx):
+
+```powershell
+npx firebase-tools login
 ```
 
 Pilih project:
@@ -91,10 +97,22 @@ Pilih project:
 firebase use --add
 ```
 
+Jika pakai Opsi B, gunakan juga bentuk `npx` untuk command berikut:
+
+```powershell
+npx firebase-tools use --add
+```
+
 Deploy rules:
 
 ```powershell
 firebase deploy --only firestore:rules
+```
+
+Jika pakai Opsi B:
+
+```powershell
+npx firebase-tools deploy --only firestore:rules
 ```
 
 ## 8. Jalankan Aplikasi
@@ -133,7 +151,16 @@ Periksa:
 - `NEXT_PUBLIC_FIREBASE_PROJECT_ID` benar.
 - Dev server sudah direstart.
 
-### B. Error popup login Google
+### B. Command `firebase` tidak dikenali
+
+Perbaikan:
+
+- Jalankan `npm install -g firebase-tools`.
+- Tutup dan buka ulang terminal PowerShell.
+- Cek dengan `firebase --version`.
+- Jika masih gagal, gunakan command berbasis `npx`, contoh: `npx firebase-tools login`.
+
+### C. Error popup login Google
 
 Periksa:
 
@@ -141,7 +168,7 @@ Periksa:
 - `localhost` ada di Authorized domains.
 - Browser tidak memblok popup.
 
-### C. Error `permission-denied`
+### D. Error `permission-denied`
 
 Periksa:
 
@@ -149,9 +176,29 @@ Periksa:
 - User sudah login (request.auth tidak null).
 - Path data sesuai `users/{uid}/...`.
 
-### D. Error soal index Firestore
+### E. Error soal index Firestore
 
 Saat ini query bawaan umumnya memakai single-field `orderBy` dan biasanya tidak butuh index komposit manual. Jika Firebase meminta index, ikuti link yang muncul di error log untuk membuat index tersebut.
+
+### F. Data awal masih berisi data demo
+
+Jika kamu sempat login sebelum auto-seed dimatikan, data demo mungkin sudah terlanjur tersimpan di Firestore.
+
+Cara bersihkan data user:
+
+1. Buka Firebase Console -> Authentication -> Users.
+2. Salin UID user yang ingin dibersihkan.
+3. Jalankan:
+
+```powershell
+firebase firestore:delete /users/<UID> --recursive --force
+```
+
+4. Logout lalu login ulang di aplikasi.
+
+Opsional: jika cache browser masih menampilkan data lama, hapus localStorage key:
+
+- `finance-tracker-user-cache-v1`
 
 ## 11. Checklist Siap Production
 

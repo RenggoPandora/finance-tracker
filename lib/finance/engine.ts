@@ -145,13 +145,37 @@ export function calculateFinanceSnapshot({
     wallets.map((wallet) => [wallet.id, wallet.balance]),
   );
 
+  const spendingLimitWallets = wallets.filter((wallet) => wallet.isSpendingLimitSource);
+  const isSpendingLimitWalletSelectionActive = spendingLimitWallets.length > 0;
+  const spendingLimitSourceWallets = isSpendingLimitWalletSelectionActive
+    ? spendingLimitWallets
+    : wallets;
+
+  const spendingLimitSourceWalletIds = new Set(
+    spendingLimitSourceWallets.map((wallet) => wallet.id),
+  );
+
+  const spendingLimitSourceBalance = sumBy(
+    spendingLimitSourceWallets,
+    (wallet) => wallet.balance,
+  );
+
+  const spendingLimitExpenses = sumBy(
+    monthTransactions.filter(
+      (transaction) =>
+        transaction.type === "expense" && spendingLimitSourceWalletIds.has(transaction.walletId),
+    ),
+    (transaction) => transaction.amount,
+  );
+
   const goalWalletIds = new Set(goals.map((goal) => goal.linkedWalletId));
+
   const lockedGoals = Array.from(goalWalletIds).reduce((sum, walletId) => {
     const walletBalance = walletBalanceById[walletId];
     return sum + Math.max(0, walletBalance ?? 0);
   }, 0);
 
-  const availableMoney = totalBalance - remainingPlannedExpenses - lockedGoals;
+  const availableMoney = Math.max(0, spendingLimitSourceBalance - spendingLimitExpenses);
 
   const year = referenceDay.getFullYear();
   const month = referenceDay.getMonth();
@@ -264,6 +288,10 @@ export function calculateFinanceSnapshot({
     actualRoutineTotal,
     remainingPlannedExpenses,
     lockedGoals,
+    spendingLimitSourceBalance,
+    spendingLimitExpenses,
+    spendingLimitSourceWalletCount: spendingLimitSourceWallets.length,
+    isSpendingLimitWalletSelectionActive,
     availableMoney,
     remainingDays,
     baseDailyBudget,

@@ -60,6 +60,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusTone, setStatusTone] = useState<"success" | "error" | null>(null);
 
   const [fromWalletId, setFromWalletId] = useState("");
   const [toWalletId, setToWalletId] = useState("");
@@ -80,6 +81,23 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
   const formDisabled = !uid || syncStatus === "loading" || isSubmitting;
   const hasEnoughWallets = dataset.wallets.length >= 2;
+  const submitDisabled =
+    formDisabled || !hasEnoughWallets || !fromWalletId || !toWalletId;
+
+  function setErrorStatus(message: string): void {
+    setStatusTone("error");
+    setStatusMessage(message);
+  }
+
+  function setSuccessStatus(message: string): void {
+    setStatusTone("success");
+    setStatusMessage(message);
+  }
+
+  function clearStatus(): void {
+    setStatusTone(null);
+    setStatusMessage(null);
+  }
 
   const transferMap = useMemo(
     () => Object.fromEntries(recentTransfers.map((transfer) => [transfer.id, transfer])),
@@ -171,19 +189,24 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     event.preventDefault();
 
     if (!hasEnoughWallets) {
-      setStatusMessage("Minimal dua wallet dibutuhkan untuk transfer.");
+      setErrorStatus("Minimal dua wallet dibutuhkan untuk transfer.");
+      return;
+    }
+
+    if (!fromWalletId || !toWalletId) {
+      setErrorStatus("Pilih wallet asal dan tujuan transfer.");
       return;
     }
 
     if (fromWalletId === toWalletId) {
-      setStatusMessage("Wallet asal dan tujuan harus berbeda.");
+      setErrorStatus("Wallet asal dan tujuan harus berbeda.");
       return;
     }
 
     try {
       const parsedAmount = parseTransferAmount(amount);
       setIsSubmitting(true);
-      setStatusMessage(null);
+      clearStatus();
 
       await createTransfer({
         fromWalletId,
@@ -196,9 +219,9 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       setAmount("");
       setNote("");
       setDate(todayIsoDate());
-      setStatusMessage("Transfer berhasil ditambahkan.");
+      setSuccessStatus("Transfer berhasil ditambahkan.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menambah transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Gagal menambah transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -211,7 +234,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     setEditAmount(String(transfer.amount));
     setEditDate(transfer.date);
     setEditNote(transfer.note ?? "");
-    setStatusMessage(null);
+    clearStatus();
   }
 
   function cancelEdit(): void {
@@ -221,7 +244,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     setEditAmount("");
     setEditDate(todayIsoDate());
     setEditNote("");
-    setStatusMessage(null);
+    clearStatus();
   }
 
   async function handleUpdateTransfer(
@@ -231,14 +254,14 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
     event.preventDefault();
 
     if (editFromWalletId === editToWalletId) {
-      setStatusMessage("Wallet asal dan tujuan harus berbeda.");
+      setErrorStatus("Wallet asal dan tujuan harus berbeda.");
       return;
     }
 
     try {
       const parsedAmount = parseTransferAmount(editAmount);
       setIsSubmitting(true);
-      setStatusMessage(null);
+      clearStatus();
 
       await updateTransfer(transferId, {
         fromWalletId: editFromWalletId,
@@ -249,9 +272,9 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       });
 
       setEditingTransferId(null);
-      setStatusMessage("Transfer berhasil diperbarui.");
+      setSuccessStatus("Transfer berhasil diperbarui.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal memperbarui transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Gagal memperbarui transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -275,12 +298,12 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
     try {
       setIsSubmitting(true);
-      setStatusMessage(null);
+      clearStatus();
       await deleteTransfer(transferId);
       setEditingTransferId((current) => (current === transferId ? null : current));
-      setStatusMessage("Transfer berhasil dihapus.");
+      setSuccessStatus("Transfer berhasil dihapus.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Gagal menghapus transfer.");
+      setErrorStatus(error instanceof Error ? error.message : "Gagal menghapus transfer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -295,6 +318,15 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
       {preferredTargetWalletName ? (
         <p className="mt-1 text-xs text-(--accent-deep)">
           Target wallet goal dipilih otomatis: {preferredTargetWalletName}
+        </p>
+      ) : null}
+      {statusMessage ? (
+        <p
+          className={`mt-2 text-sm ${
+            statusTone === "success" ? "text-(--safe)" : "text-(--over)"
+          }`}
+        >
+          {statusMessage}
         </p>
       ) : null}
 
@@ -357,7 +389,7 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
 
           <button
             type="submit"
-            disabled={formDisabled || !hasEnoughWallets}
+            disabled={submitDisabled}
             className="w-full rounded-xl bg-(--accent) px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             Simpan Transfer
@@ -560,7 +592,6 @@ export default function TransferManager({ preferredToWalletId }: TransferManager
         </div>
       </div>
 
-      {statusMessage ? <p className="mt-4 text-sm text-(--ink-muted)">{statusMessage}</p> : null}
       {!uid ? (
         <p className="mt-2 text-sm text-(--over)">Login dulu untuk mengelola transfer.</p>
       ) : null}

@@ -19,6 +19,13 @@ interface CachedUserFinance extends FinanceDataset {
   updatedAt: string;
 }
 
+function normalizeWallet(wallet: Wallet): Wallet {
+  return {
+    ...wallet,
+    isSpendingLimitSource: Boolean(wallet.isSpendingLimitSource),
+  };
+}
+
 interface FinanceStoreState extends FinanceDataset {
   uid: string | null;
   mode: BudgetMode;
@@ -37,11 +44,15 @@ interface FinanceStoreState extends FinanceDataset {
   appendWallet: (wallet: Wallet) => void;
   updateWallet: (
     walletId: string,
-    updates: Partial<Pick<Wallet, "name" | "type" | "balance">>,
+    updates: Partial<Pick<Wallet, "name" | "type" | "balance" | "isSpendingLimitSource">>,
   ) => void;
   removeWallet: (walletId: string) => void;
   prependTransaction: (transaction: Transaction) => void;
   prependRoutineExpense: (routineExpense: RoutineExpense) => void;
+  updateRoutineExpense: (
+    routineExpenseId: string,
+    updates: Partial<Omit<RoutineExpense, "id">>,
+  ) => void;
   prependGoal: (goal: Goal) => void;
   prependTransfer: (transfer: Transfer) => void;
   updateTransfer: (
@@ -61,7 +72,7 @@ const EMPTY_DATASET: FinanceDataset = {
 
 function copyDataset(dataset: FinanceDataset): FinanceDataset {
   return {
-    wallets: [...dataset.wallets],
+    wallets: dataset.wallets.map(normalizeWallet),
     transactions: [...dataset.transactions],
     routineExpenses: [...dataset.routineExpenses],
     goals: [...dataset.goals],
@@ -176,7 +187,11 @@ export const useFinanceStore = create<FinanceStoreState>()(
       },
 
       setWallets: (wallets) => {
-        set((state) => withCollectionUpdate(state, { wallets }));
+        set((state) =>
+          withCollectionUpdate(state, {
+            wallets: wallets.map(normalizeWallet),
+          }),
+        );
       },
 
       setTransactions: (transactions) => {
@@ -197,9 +212,9 @@ export const useFinanceStore = create<FinanceStoreState>()(
 
       appendWallet: (wallet) => {
         set((state) => {
-          const wallets = [...state.wallets, wallet].sort((left, right) =>
-            left.name.localeCompare(right.name),
-          );
+          const wallets = [...state.wallets, normalizeWallet(wallet)]
+            .map(normalizeWallet)
+            .sort((left, right) => left.name.localeCompare(right.name));
 
           return withCollectionUpdate(state, { wallets });
         });
@@ -208,7 +223,11 @@ export const useFinanceStore = create<FinanceStoreState>()(
       updateWallet: (walletId, updates) => {
         set((state) => {
           const wallets = state.wallets
-            .map((wallet) => (wallet.id === walletId ? { ...wallet, ...updates } : wallet))
+            .map((wallet) =>
+              wallet.id === walletId
+                ? normalizeWallet({ ...wallet, ...updates })
+                : normalizeWallet(wallet),
+            )
             .sort((left, right) => left.name.localeCompare(right.name));
 
           return withCollectionUpdate(state, { wallets });
@@ -234,6 +253,22 @@ export const useFinanceStore = create<FinanceStoreState>()(
           const routineExpenses = [...state.routineExpenses, routineExpense].sort((left, right) =>
             (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31"),
           );
+
+          return withCollectionUpdate(state, { routineExpenses });
+        });
+      },
+
+      updateRoutineExpense: (routineExpenseId, updates) => {
+        set((state) => {
+          const routineExpenses = state.routineExpenses
+            .map((routineExpense) =>
+              routineExpense.id === routineExpenseId
+                ? { ...routineExpense, ...updates }
+                : routineExpense,
+            )
+            .sort((left, right) =>
+              (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31"),
+            );
 
           return withCollectionUpdate(state, { routineExpenses });
         });

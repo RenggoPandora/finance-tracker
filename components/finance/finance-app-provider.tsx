@@ -6,7 +6,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -20,8 +19,8 @@ import {
   addTransaction,
   deleteTransfer,
   deleteWallet,
-  seedFinanceCollectionsIfEmpty,
   subscribeToFinanceCollections,
+  updateRoutineExpense,
   updateTransfer,
   updateWallet,
   upsertUserProfile,
@@ -35,8 +34,20 @@ import {
   type NewTransferInput,
   type NewTransactionInput,
   type NewWalletInput,
+  type RoutineExpense,
+  type FinanceDataset,
   type Wallet,
 } from "@/lib/finance/types";
+
+function createEmptyFinanceDataset(): FinanceDataset {
+  return {
+    wallets: [],
+    transactions: [],
+    routineExpenses: [],
+    goals: [],
+    transfers: [],
+  };
+}
 
 function createLocalId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -102,6 +113,10 @@ interface FinanceAppContextValue {
   deleteTransfer: (transferId: string) => Promise<void>;
   createTransaction: (payload: NewTransactionInput) => Promise<void>;
   createRoutineExpense: (payload: NewRoutineExpenseInput) => Promise<void>;
+  updateRoutineExpense: (
+    routineExpenseId: string,
+    updates: Partial<Pick<RoutineExpense, "plannedAmount" | "isDone" | "actualAmount" | "actualDate">>,
+  ) => Promise<void>;
   createGoal: (payload: NewGoalInput) => Promise<void>;
 }
 
@@ -113,12 +128,12 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const seededUsersRef = useRef<Set<string>>(new Set());
 
   const uid = useFinanceStore((state) => state.uid);
   const mode = useFinanceStore((state) => state.mode);
   const wallets = useFinanceStore((state) => state.wallets);
   const transactions = useFinanceStore((state) => state.transactions);
+  const routineExpenses = useFinanceStore((state) => state.routineExpenses);
   const goals = useFinanceStore((state) => state.goals);
   const transfers = useFinanceStore((state) => state.transfers);
   const syncStatus = useFinanceStore((state) => state.syncStatus);
@@ -137,6 +152,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
   const removeWalletFromStore = useFinanceStore((state) => state.removeWallet);
   const prependTransaction = useFinanceStore((state) => state.prependTransaction);
   const prependRoutineExpense = useFinanceStore((state) => state.prependRoutineExpense);
+  const updateRoutineExpenseInStore = useFinanceStore((state) => state.updateRoutineExpense);
   const prependGoal = useFinanceStore((state) => state.prependGoal);
   const prependTransfer = useFinanceStore((state) => state.prependTransfer);
   const updateTransferInStore = useFinanceStore((state) => state.updateTransfer);
@@ -160,7 +176,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      activateUser(nextUser.uid, createMockFinanceDataset(sessionDate));
+      activateUser(nextUser.uid, createEmptyFinanceDataset());
 
       void (async () => {
         try {
@@ -170,14 +186,6 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
             displayName: nextUser.displayName,
             photoURL: nextUser.photoURL,
           });
-
-          if (!seededUsersRef.current.has(nextUser.uid)) {
-            await seedFinanceCollectionsIfEmpty(
-              nextUser.uid,
-              createMockFinanceDataset(sessionDate),
-            );
-            seededUsersRef.current.add(nextUser.uid);
-          }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Gagal menyiapkan profile Firebase.";
@@ -286,6 +294,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
         name,
         type: payload.type,
         balance,
+        isSpendingLimitSource: Boolean(payload.isSpendingLimitSource),
       };
 
       if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
@@ -324,6 +333,10 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
           throw new Error("Saldo wallet harus berupa angka valid.");
         }
         nextUpdates.balance = nextBalance;
+      }
+
+      if (updates.isSpendingLimitSource !== undefined) {
+        nextUpdates.isSpendingLimitSource = Boolean(updates.isSpendingLimitSource);
       }
 
       if (Object.keys(nextUpdates).length === 0) {
@@ -512,14 +525,47 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
         throw new Error("Login dulu sebelum menambah transaksi.");
       }
 
+      const amount = Number(payload.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Nominal transaksi harus lebih dari 0.");
+      }
+
+      if (!payload.walletId) {
+        throw new Error("Wallet transaksi wajib dipilih.");
+      }
+
+      const targetWallet = wallets.find((wallet) => wallet.id === payload.walletId);
+      if (!targetWallet) {
+        throw new Error("Wallet transaksi tidak ditemukan.");
+      }
+
+      const nextPayload: NewTransactionInput = {
+        ...payload,
+        amount,
+        note: payload.note?.trim() || undefined,
+      };
+
       if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
-        prependTransaction({ id: createLocalId("tx"), ...payload });
+        const walletDelta = nextPayload.type === "income" ? nextPayload.amount : -nextPayload.amount;
+        const nextBalance = targetWallet.balance + walletDelta;
+
+        if (nextBalance < 0) {
+          throw new Error("Saldo wallet tidak cukup untuk transaksi expense.");
+        }
+
+        setWallets(
+          wallets.map((wallet) =>
+            wallet.id === targetWallet.id ? { ...wallet, balance: nextBalance } : wallet,
+          ),
+        );
+
+        prependTransaction({ id: createLocalId("tx"), ...nextPayload });
         return;
       }
 
-      await addTransaction(uid, payload);
+      await addTransaction(uid, nextPayload);
     },
-    [uid, prependTransaction],
+    [uid, wallets, setWallets, prependTransaction],
   );
 
   const createRoutineExpense = useCallback(
@@ -536,6 +582,64 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       await addRoutineExpense(uid, payload);
     },
     [uid, prependRoutineExpense],
+  );
+
+  const updateRoutineExpenseEntry = useCallback(
+    async (
+      routineExpenseId: string,
+      updates: Partial<
+        Pick<RoutineExpense, "plannedAmount" | "isDone" | "actualAmount" | "actualDate">
+      >,
+    ): Promise<void> => {
+      if (!uid) {
+        throw new Error("Login dulu sebelum mengubah routine.");
+      }
+
+      const currentRoutine = routineExpenses.find((routineExpense) => routineExpense.id === routineExpenseId);
+      if (!currentRoutine) {
+        throw new Error("Routine tidak ditemukan.");
+      }
+
+      const nextUpdates: Partial<
+        Pick<RoutineExpense, "plannedAmount" | "isDone" | "actualAmount" | "actualDate">
+      > = {};
+
+      if (updates.plannedAmount !== undefined) {
+        const plannedAmount = Number(updates.plannedAmount);
+        if (!Number.isFinite(plannedAmount) || plannedAmount <= 0) {
+          throw new Error("Estimasi harga routine harus lebih dari 0.");
+        }
+        nextUpdates.plannedAmount = plannedAmount;
+      }
+
+      if (updates.isDone !== undefined) {
+        nextUpdates.isDone = updates.isDone;
+      }
+
+      if (updates.actualAmount !== undefined) {
+        const actualAmount = Number(updates.actualAmount);
+        if (!Number.isFinite(actualAmount) || actualAmount < 0) {
+          throw new Error("Nominal actual routine tidak valid.");
+        }
+        nextUpdates.actualAmount = actualAmount;
+      }
+
+      if (updates.actualDate !== undefined) {
+        nextUpdates.actualDate = updates.actualDate;
+      }
+
+      if (Object.keys(nextUpdates).length === 0) {
+        return;
+      }
+
+      if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
+        updateRoutineExpenseInStore(routineExpenseId, nextUpdates);
+        return;
+      }
+
+      await updateRoutineExpense(uid, routineExpenseId, nextUpdates);
+    },
+    [uid, routineExpenses, updateRoutineExpenseInStore],
   );
 
   const createGoal = useCallback(
@@ -600,6 +704,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       deleteTransfer: deleteTransferEntry,
       createTransaction,
       createRoutineExpense,
+      updateRoutineExpense: updateRoutineExpenseEntry,
       createGoal,
     }),
     [
@@ -624,6 +729,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       deleteTransferEntry,
       createTransaction,
       createRoutineExpense,
+      updateRoutineExpenseEntry,
       createGoal,
     ],
   );
