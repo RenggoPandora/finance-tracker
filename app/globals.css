@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: #ffffff;
+  --ink: #1d2a22;
+  --ink-muted: #4f6055;
+  --ink-soft: #6f8074;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --line: #dfe6de;
+  --accent: #1c857d;
+  --accent-deep: #19645e;
+  --safe: #218046;
+  --safe-soft: #dff4e3;
+  --warning: #b28008;
+  --warning-soft: #fcedc7;
+  --over: #be3737;
+  --over-soft: #f7dada;
+  --blob-one: #8cc4b355;
+  --blob-two: #f0b38666;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-sora);
+  --font-mono: var(--font-ibm-plex-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sora), "Segoe UI", sans-serif;
+}
+
+.bg-finance-gradient {
+  background: #ffffff;
+}
+
+.glass-panel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(7px);
+  border-radius: 1.5rem;
+  box-shadow: 0 22px 38px -28px #10251f42;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.metric-card {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface-solid);
+  padding: 0.9rem 1rem;
+}
+
+.stat-label {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
 }

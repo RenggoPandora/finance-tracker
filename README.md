@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Personal Finance Tracker
 
-## Getting Started
+Web app pencatatan keuangan pribadi berbasis Next.js App Router dengan fitur:
 
-First, run the development server:
+- Income/expense tracking
+- Multi-wallet management
+- Routine expense (planned vs actual)
+- Adaptive smart spending limit (strict/flexible)
+- Financial goals (locked funds)
+- Dashboard analytics + gamification score
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- Tailwind CSS v4
+- Firebase Auth (Google Sign-In)
+- Firestore (per-user collections)
+- Zustand (client state + persisted cache per user)
+
+## Local Setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy env template:
+
+```bash
+# macOS / Linux
+cp .env.example .env.local
+
+# Windows PowerShell
+Copy-Item .env.example .env.local
+```
+
+3. Isi semua variabel Firebase di `.env.local`:
+
+```txt
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
+```
+
+4. Jalankan app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Jika env Firebase belum diisi, aplikasi tetap jalan dalam mode demo lokal.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Firebase Integration Guide
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Panduan lengkap setup Firebase (Auth + Firestore + deploy rules) ada di:
 
-## Learn More
+- `FIREBASE_SETUP.md`
 
-To learn more about Next.js, take a look at the following resources:
+## Firestore Schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Struktur dokumen:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `users/{uid}`
+- `users/{uid}/wallets/{walletId}`
+- `users/{uid}/transactions/{transactionId}`
+- `users/{uid}/routine_expenses/{routineExpenseId}`
+- `users/{uid}/goals/{goalId}`
+- `users/{uid}/transfers/{transferId}`
 
-## Deploy on Vercel
+Rules awal ada di `firestore.rules`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Validation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run build
+```
