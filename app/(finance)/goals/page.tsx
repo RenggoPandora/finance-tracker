@@ -19,7 +19,7 @@ function parseTopUpAmount(value: string): number {
 }
 
 export default function GoalsPage() {
-  const { uid, syncStatus, createTransaction, updateGoal, deleteGoal } = useFinanceAppContext();
+  const { uid, syncStatus, createTransaction, updateGoal, completeGoal, deleteGoal } = useFinanceAppContext();
   const { dataset, snapshot, walletNameById } = useFinanceData();
   const totalGoals = snapshot.goalProgress.length;
 
@@ -212,6 +212,41 @@ export default function GoalsPage() {
     }
   }
 
+  async function handleGoalComplete(
+    goalId: string,
+    goalName: string,
+    targetAmount: number,
+  ): Promise<void> {
+    if (!uid) {
+      setStatusMessage("Sign in to complete goals.");
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      `Mark goal "${goalName}" as completed? This will deduct ${formatCurrency(targetAmount)} from its linked wallet.`,
+    );
+    if (!isConfirmed) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setStatusMessage(null);
+
+      await completeGoal(goalId);
+
+      setActiveTopUpGoalId((current) => (current === goalId ? null : current));
+      setActiveEditGoalId((current) => (current === goalId ? null : current));
+      setTopUpAmount("");
+      setTopUpNote("");
+      setStatusMessage(`Goal ${goalName} completed.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Failed to complete goal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <section className="glass-panel p-5 sm:p-6">
       <h2 className="text-xl font-semibold">Financial Goals</h2>
@@ -245,7 +280,18 @@ export default function GoalsPage() {
                     : ""
                 }`}
               >
-                <p className="font-semibold">{goal.name}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold">{goal.name}</p>
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                      goal.isCompleted
+                        ? "bg-(--safe-soft) text-(--safe)"
+                        : "bg-(--warning-soft) text-(--warning)"
+                    }`}
+                  >
+                    {goal.isCompleted ? "Completed" : "Active"}
+                  </span>
+                </div>
                 <p className="mt-1 text-sm text-(--ink-muted)">
                   Target {formatCurrency(goal.targetAmount)} - deadline {formatDate(goal.deadline)}
                 </p>
@@ -253,7 +299,9 @@ export default function GoalsPage() {
                   Wallet: {walletNameById[goal.linkedWalletId] ?? goal.linkedWalletId}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-(--accent-deep)">
-                  Locked funds: {formatCurrency(goal.currentSaved)}
+                  {goal.isCompleted
+                    ? `Completed amount: ${formatCurrency(goal.targetAmount)}`
+                    : `Locked funds: ${formatCurrency(goal.currentSaved)}`}
                 </p>
 
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-(--line)">
@@ -265,38 +313,54 @@ export default function GoalsPage() {
 
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <p className="font-semibold">{formatPercent(goal.progressRatio)}</p>
-                  <p className="text-(--ink-muted)">Left {compactCurrency(goal.amountLeft)}</p>
+                  <p className="text-(--ink-muted)">
+                    {goal.isCompleted ? "Completed" : `Left ${compactCurrency(goal.amountLeft)}`}
+                  </p>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      isTopUpOpen ? cancelTopUp() : startTopUp(goal.id)
-                    }
-                    disabled={formDisabled}
-                    className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) transition-colors hover:bg-(--surface-solid)"
-                  >
-                    {isTopUpOpen ? "Close Top-up" : "Top Up Goal"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      isEditOpen
-                        ? cancelEdit()
-                        : startEdit(
-                            goal.id,
-                            goal.name,
-                            goal.targetAmount,
-                            goal.deadline,
-                            goal.linkedWalletId,
-                          )
-                    }
-                    disabled={formDisabled}
-                    className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) transition-colors hover:bg-(--surface-solid)"
-                  >
-                    {isEditOpen ? "Close Edit" : "Edit Goal"}
-                  </button>
+                  {!goal.isCompleted ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        isTopUpOpen ? cancelTopUp() : startTopUp(goal.id)
+                      }
+                      disabled={formDisabled}
+                      className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) transition-colors hover:bg-(--surface-solid)"
+                    >
+                      {isTopUpOpen ? "Close Top-up" : "Top Up Goal"}
+                    </button>
+                  ) : null}
+                  {!goal.isCompleted ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        isEditOpen
+                          ? cancelEdit()
+                          : startEdit(
+                              goal.id,
+                              goal.name,
+                              goal.targetAmount,
+                              goal.deadline,
+                              goal.linkedWalletId,
+                            )
+                      }
+                      disabled={formDisabled}
+                      className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) transition-colors hover:bg-(--surface-solid)"
+                    >
+                      {isEditOpen ? "Close Edit" : "Edit Goal"}
+                    </button>
+                  ) : null}
+                  {!goal.isCompleted ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleGoalComplete(goal.id, goal.name, goal.targetAmount)}
+                      disabled={formDisabled}
+                      className="rounded-xl border border-(--safe) bg-white px-3 py-2 text-xs font-semibold text-(--safe) transition-colors hover:bg-(--safe-soft)"
+                    >
+                      Mark Completed
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void handleGoalDelete(goal.id, goal.name)}
@@ -307,7 +371,7 @@ export default function GoalsPage() {
                   </button>
                 </div>
 
-                {isTopUpOpen ? (
+                {isTopUpOpen && !goal.isCompleted ? (
                   <form
                     onSubmit={(event) =>
                       void handleTopUpSubmit(event, goal.id, goal.linkedWalletId, goal.name)
@@ -355,7 +419,7 @@ export default function GoalsPage() {
                   </form>
                 ) : null}
 
-                {isEditOpen ? (
+                {isEditOpen && !goal.isCompleted ? (
                   <form
                     onSubmit={(event) => void handleGoalEditSubmit(event, goal.id)}
                     className="mt-3 space-y-2 rounded-xl border border-(--line) bg-white p-3"

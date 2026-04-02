@@ -52,6 +52,14 @@ function normalizeWallet(wallet: Wallet): Wallet {
   };
 }
 
+function normalizeGoal(goal: Goal): Goal {
+  return {
+    ...goal,
+    isCompleted: Boolean(goal.isCompleted),
+    completedAt: goal.completedAt?.trim() || undefined,
+  };
+}
+
 interface FinanceStoreState extends FinanceDataset {
   uid: string | null;
   mode: BudgetMode;
@@ -82,7 +90,9 @@ interface FinanceStoreState extends FinanceDataset {
   prependGoal: (goal: Goal) => void;
   updateGoal: (
     goalId: string,
-    updates: Partial<Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
+    updates: Partial<
+      Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId" | "isCompleted" | "completedAt">
+    >,
   ) => void;
   removeGoal: (goalId: string) => void;
   prependTransfer: (transfer: Transfer) => void;
@@ -106,7 +116,7 @@ function copyDataset(dataset: FinanceDataset): FinanceDataset {
     wallets: dataset.wallets.map(normalizeWallet),
     transactions: [...dataset.transactions],
     routineExpenses: [...dataset.routineExpenses],
-    goals: [...dataset.goals],
+    goals: dataset.goals.map(normalizeGoal),
     transfers: [...dataset.transfers],
   };
 }
@@ -234,7 +244,7 @@ export const useFinanceStore = create<FinanceStoreState>()(
       },
 
       setGoals: (goals) => {
-        set((state) => withCollectionUpdate(state, { goals }));
+        set((state) => withCollectionUpdate(state, { goals: goals.map(normalizeGoal) }));
       },
 
       setTransfers: (transfers) => {
@@ -307,7 +317,7 @@ export const useFinanceStore = create<FinanceStoreState>()(
 
       prependGoal: (goal) => {
         set((state) => {
-          const goals = [...state.goals, goal].sort((left, right) =>
+          const goals = [...state.goals, normalizeGoal(goal)].sort((left, right) =>
             left.deadline.localeCompare(right.deadline),
           );
 
@@ -318,7 +328,7 @@ export const useFinanceStore = create<FinanceStoreState>()(
       updateGoal: (goalId, updates) => {
         set((state) => {
           const goals = state.goals
-            .map((goal) => (goal.id === goalId ? { ...goal, ...updates } : goal))
+            .map((goal) => (goal.id === goalId ? normalizeGoal({ ...goal, ...updates }) : normalizeGoal(goal)))
             .sort((left, right) => left.deadline.localeCompare(right.deadline));
 
           return withCollectionUpdate(state, { goals });

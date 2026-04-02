@@ -23,6 +23,7 @@ import {
   addGoal,
   addRoutineExpense,
   addTransaction,
+  completeGoal as completeGoalInFirestore,
   deleteGoal,
   deleteTransfer,
   deleteWallet,
@@ -133,6 +134,7 @@ interface FinanceAppContextValue {
     goalId: string,
     updates: Partial<Pick<NewGoalInput, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
   ) => Promise<void>;
+  completeGoal: (goalId: string) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
 }
 
@@ -769,6 +771,8 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       const nextGoal = {
         ...payload,
         currentSaved: 0,
+        isCompleted: false,
+        completedAt: undefined,
       };
 
       if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
@@ -795,6 +799,10 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       const currentGoal = goals.find((goal) => goal.id === goalId);
       if (!currentGoal) {
         throw new Error("Goal was not found.");
+      }
+
+      if (currentGoal.isCompleted) {
+        throw new Error("Completed goals cannot be edited.");
       }
 
       const nextUpdates: Partial<
@@ -857,6 +865,55 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
     [uid, goals, wallets, updateGoalInStore],
   );
 
+  const completeGoalEntry = useCallback(
+    async (goalId: string): Promise<void> => {
+      if (!uid) {
+        throw new Error("Sign in before completing a goal.");
+      }
+
+      const currentGoal = goals.find((goal) => goal.id === goalId);
+      if (!currentGoal) {
+        throw new Error("Goal was not found.");
+      }
+
+      if (currentGoal.isCompleted) {
+        return;
+      }
+
+      const deductionAmount = Number(currentGoal.targetAmount);
+      if (!Number.isFinite(deductionAmount) || deductionAmount <= 0) {
+        throw new Error("Goal target amount is invalid.");
+      }
+
+      const linkedWallet = wallets.find((wallet) => wallet.id === currentGoal.linkedWalletId);
+      if (!linkedWallet) {
+        throw new Error("Goal wallet was not found.");
+      }
+
+      const nextWalletBalance = linkedWallet.balance - deductionAmount;
+      if (nextWalletBalance < 0) {
+        throw new Error("Insufficient linked wallet balance to complete this goal.");
+      }
+
+      if (!isFirebaseConfigured || uid === LOCAL_DEMO_UID) {
+        setWallets(
+          wallets.map((wallet) =>
+            wallet.id === linkedWallet.id ? { ...wallet, balance: nextWalletBalance } : wallet,
+          ),
+        );
+
+        updateGoalInStore(goalId, {
+          isCompleted: true,
+          completedAt: new Date().toISOString().slice(0, 10),
+        });
+        return;
+      }
+
+      await completeGoalInFirestore(uid, goalId);
+    },
+    [uid, goals, wallets, setWallets, updateGoalInStore],
+  );
+
   const deleteGoalEntry = useCallback(
     async (goalId: string): Promise<void> => {
       if (!uid) {
@@ -908,6 +965,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       updateRoutineExpense: updateRoutineExpenseEntry,
       createGoal,
       updateGoal: updateGoalEntry,
+      completeGoal: completeGoalEntry,
       deleteGoal: deleteGoalEntry,
     }),
     [
@@ -935,6 +993,7 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       updateRoutineExpenseEntry,
       createGoal,
       updateGoalEntry,
+      completeGoalEntry,
       deleteGoalEntry,
     ],
   );

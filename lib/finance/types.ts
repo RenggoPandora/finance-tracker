@@ -39,6 +39,8 @@ export interface Goal {
   deadline: string;
   currentSaved: number;
   linkedWalletId: string;
+  isCompleted?: boolean;
+  completedAt?: string;
 }
 
 export interface Transfer {

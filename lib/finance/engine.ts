@@ -165,7 +165,8 @@ export function calculateFinanceSnapshot({
     (transaction) => transaction.amount,
   );
 
-  const goalWalletIds = new Set(goals.map((goal) => goal.linkedWalletId));
+  const activeGoals = goals.filter((goal) => !goal.isCompleted);
+  const goalWalletIds = new Set(activeGoals.map((goal) => goal.linkedWalletId));
 
   const lockedGoals = Array.from(goalWalletIds).reduce((sum, walletId) => {
     const walletBalance = walletBalanceById[walletId];
@@ -269,15 +270,31 @@ export function calculateFinanceSnapshot({
     share: totalBalance <= 0 ? 0 : wallet.balance / totalBalance,
   }));
 
-  const goalProgress = goals.map((goal) => ({
-    ...goal,
-    currentSaved: Math.max(0, walletBalanceById[goal.linkedWalletId] ?? 0),
-    progressRatio:
-      goal.targetAmount <= 0
-        ? 0
-        : clamp((Math.max(0, walletBalanceById[goal.linkedWalletId] ?? 0)) / goal.targetAmount, 0, 1),
-    amountLeft: Math.max(0, goal.targetAmount - Math.max(0, walletBalanceById[goal.linkedWalletId] ?? 0)),
-  }));
+  const goalProgress = goals.map((goal) => {
+    const rawGoalTargetAmount = Number(goal.targetAmount);
+    const goalTargetAmount = Number.isFinite(rawGoalTargetAmount) ? rawGoalTargetAmount : 0;
+    const linkedWalletBalance = Math.max(0, walletBalanceById[goal.linkedWalletId] ?? 0);
+    const isCompleted = Boolean(goal.isCompleted);
+
+    if (isCompleted) {
+      return {
+        ...goal,
+        isCompleted,
+        currentSaved: Math.max(0, goalTargetAmount),
+        progressRatio: 1,
+        amountLeft: 0,
+      };
+    }
+
+    return {
+      ...goal,
+      isCompleted,
+      currentSaved: linkedWalletBalance,
+      progressRatio:
+        goalTargetAmount <= 0 ? 0 : clamp(linkedWalletBalance / goalTargetAmount, 0, 1),
+      amountLeft: Math.max(0, goalTargetAmount - linkedWalletBalance),
+    };
+  });
 
   const transferVolume = sumBy(
     transfers.filter((transfer) => isSameMonth(toDate(transfer.date), referenceDay)),

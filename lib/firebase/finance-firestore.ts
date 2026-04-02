@@ -71,6 +71,14 @@ function normalizeWallet(wallet: Wallet): Wallet {
   };
 }
 
+function normalizeGoal(goal: Goal): Goal {
+  return {
+    ...goal,
+    isCompleted: Boolean(goal.isCompleted),
+    completedAt: goal.completedAt?.trim() || undefined,
+  };
+}
+
 function userDocument(uid: string) {
   return doc(requireFirestore(), FIRESTORE_COLLECTIONS.users, uid);
 }
@@ -308,7 +316,7 @@ export function subscribeToFinanceCollections(
   unsubscribeList.push(
     onSnapshot(
       query(userCollection(uid, FIRESTORE_COLLECTIONS.goals), orderBy("deadline", "asc")),
-      (snapshot) => callbacks.onGoals(mapSnapshotRows<Goal>(snapshot)),
+      (snapshot) => callbacks.onGoals(mapSnapshotRows<Goal>(snapshot).map(normalizeGoal)),
       onError,
     ),
   );
@@ -416,10 +424,17 @@ export async function addRoutineExpense(
 }
 
 export async function addGoal(uid: string, input: NewGoalInput): Promise<string> {
+  const nextGoal: NewGoalInput = {
+    ...input,
+    currentSaved: Number(input.currentSaved) || 0,
+    isCompleted: Boolean(input.isCompleted),
+    completedAt: input.completedAt?.trim() || undefined,
+  };
+
   const result = await addDoc(
     userCollection(uid, FIRESTORE_COLLECTIONS.goals),
     compactObject({
-      ...input,
+      ...nextGoal,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }),
@@ -490,7 +505,9 @@ export async function deleteWallet(uid: string, walletId: string): Promise<void>
 export async function updateGoal(
   uid: string,
   goalId: string,
-  updates: Partial<Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId">>,
+  updates: Partial<
+    Pick<Goal, "name" | "targetAmount" | "deadline" | "linkedWalletId" | "isCompleted" | "completedAt">
+  >,
 ): Promise<void> {
   const goalRef = goalDocument(uid, goalId);
 
@@ -506,6 +523,59 @@ export async function updateGoal(
 export async function deleteGoal(uid: string, goalId: string): Promise<void> {
   const goalRef = goalDocument(uid, goalId);
   await deleteDoc(goalRef);
+}
+
+export async function completeGoal(uid: string, goalId: string): Promise<void> {
+  const goalRef = goalDocument(uid, goalId);
+  const completedAt = new Date().toISOString().slice(0, 10);
+
+  await runTransaction(requireFirestore(), async (transaction) => {
+    const goalSnapshot = await transaction.get(goalRef);
+    if (!goalSnapshot.exists()) {
+      throw new Error("Goal was not found.");
+    }
+
+    const goalData = normalizeGoal({
+      id: goalSnapshot.id,
+      ...(goalSnapshot.data() as Omit<Goal, "id">),
+    });
+
+    if (goalData.isCompleted) {
+      return;
+    }
+
+    const deductionAmount = Number(goalData.targetAmount);
+    if (!Number.isFinite(deductionAmount) || deductionAmount <= 0) {
+      throw new Error("Goal target amount is invalid.");
+    }
+
+    const linkedWalletRef = walletDocument(uid, goalData.linkedWalletId);
+    const linkedWalletSnapshot = await transaction.get(linkedWalletRef);
+    if (!linkedWalletSnapshot.exists()) {
+      throw new Error("Goal wallet was not found.");
+    }
+
+    const linkedWalletBalance = Number(linkedWalletSnapshot.data().balance);
+    if (!Number.isFinite(linkedWalletBalance)) {
+      throw new Error("Wallet balance data is invalid.");
+    }
+
+    const nextWalletBalance = linkedWalletBalance - deductionAmount;
+    if (nextWalletBalance < 0) {
+      throw new Error("Insufficient linked wallet balance to complete this goal.");
+    }
+
+    transaction.update(linkedWalletRef, {
+      balance: nextWalletBalance,
+      updatedAt: serverTimestamp(),
+    });
+
+    transaction.update(goalRef, {
+      isCompleted: true,
+      completedAt,
+      updatedAt: serverTimestamp(),
+    });
+  });
 }
 
 export async function updateTransfer(
