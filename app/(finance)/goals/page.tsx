@@ -19,12 +19,11 @@ function parseTopUpAmount(value: string): number {
 }
 
 export default function GoalsPage() {
-  const { uid, syncStatus, createTransfer, updateGoal, deleteGoal } = useFinanceAppContext();
+  const { uid, syncStatus, createTransaction, updateGoal, deleteGoal } = useFinanceAppContext();
   const { dataset, snapshot, walletNameById } = useFinanceData();
   const totalGoals = snapshot.goalProgress.length;
 
   const [activeTopUpGoalId, setActiveTopUpGoalId] = useState<string | null>(null);
-  const [fromWalletId, setFromWalletId] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpNote, setTopUpNote] = useState("");
   const [activeEditGoalId, setActiveEditGoalId] = useState<string | null>(null);
@@ -37,11 +36,9 @@ export default function GoalsPage() {
 
   const formDisabled = !uid || syncStatus === "loading" || isSubmitting;
 
-  function startTopUp(goalId: string, targetWalletId: string): void {
-    const sourceWalletOptions = dataset.wallets.filter((wallet) => wallet.id !== targetWalletId);
+  function startTopUp(goalId: string): void {
     setActiveEditGoalId(null);
     setActiveTopUpGoalId(goalId);
-    setFromWalletId(sourceWalletOptions[0]?.id ?? "");
     setTopUpAmount("");
     setTopUpNote("");
     setStatusMessage(null);
@@ -49,7 +46,6 @@ export default function GoalsPage() {
 
   function cancelTopUp(): void {
     setActiveTopUpGoalId(null);
-    setFromWalletId("");
     setTopUpAmount("");
     setTopUpNote("");
     setStatusMessage(null);
@@ -93,26 +89,18 @@ export default function GoalsPage() {
       return;
     }
 
-    if (!fromWalletId) {
-      setStatusMessage("Select a source wallet for top-up.");
-      return;
-    }
-
-    if (fromWalletId === targetWalletId) {
-      setStatusMessage("Source wallet and goal wallet must be different.");
-      return;
-    }
-
     try {
       const amount = parseTopUpAmount(topUpAmount);
       setIsSubmitting(true);
       setStatusMessage(null);
 
-      await createTransfer({
-        fromWalletId,
-        toWalletId: targetWalletId,
+      await createTransaction({
         amount,
+        type: "income",
+        category: `Goal Top-up: ${goalName}`,
         date: todayIsoDate(),
+        walletId: targetWalletId,
+        isPersonalSpending: false,
         note: topUpNote.trim() || `Goal top-up: ${goalName}`,
       });
 
@@ -204,7 +192,6 @@ export default function GoalsPage() {
 
       if (activeTopUpGoalId === goalId) {
         setActiveTopUpGoalId(null);
-        setFromWalletId("");
         setTopUpAmount("");
         setTopUpNote("");
       }
@@ -235,9 +222,6 @@ export default function GoalsPage() {
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {snapshot.goalProgress.map((goal, index) => (
           (() => {
-            const sourceWalletOptions = dataset.wallets.filter(
-              (wallet) => wallet.id !== goal.linkedWalletId,
-            );
             const isTopUpOpen = activeTopUpGoalId === goal.id;
             const isEditOpen = activeEditGoalId === goal.id;
             const walletIdsUsedByOtherGoals = new Set(
@@ -288,7 +272,7 @@ export default function GoalsPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      isTopUpOpen ? cancelTopUp() : startTopUp(goal.id, goal.linkedWalletId)
+                      isTopUpOpen ? cancelTopUp() : startTopUp(goal.id)
                     }
                     disabled={formDisabled}
                     className="rounded-xl border border-(--line) bg-white px-3 py-2 text-xs font-semibold text-(--ink-muted) transition-colors hover:bg-(--surface-solid)"
@@ -330,42 +314,31 @@ export default function GoalsPage() {
                     }
                     className="mt-3 space-y-2 rounded-xl border border-(--line) bg-white p-3"
                   >
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <select
-                        value={fromWalletId}
-                        onChange={(event) => setFromWalletId(event.target.value)}
-                        className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
-                        disabled={formDisabled || sourceWalletOptions.length === 0}
-                      >
-                        {sourceWalletOptions.map((wallet) => (
-                          <option key={wallet.id} value={wallet.id}>
-                            From: {wallet.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        value={topUpAmount}
-                        onChange={(event) => setTopUpAmount(event.target.value)}
-                        placeholder="Top-up amount"
-                        inputMode="numeric"
-                        className="rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
-                        disabled={formDisabled || sourceWalletOptions.length === 0}
-                      />
-                    </div>
+                    <input
+                      value={topUpAmount}
+                      onChange={(event) => setTopUpAmount(event.target.value)}
+                      placeholder="Top-up amount"
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
+                      disabled={formDisabled}
+                    />
 
                     <input
                       value={topUpNote}
                       onChange={(event) => setTopUpNote(event.target.value)}
                       placeholder="Note (optional)"
                       className="w-full rounded-xl border border-(--line) bg-white px-3 py-2 text-sm"
-                      disabled={formDisabled || sourceWalletOptions.length === 0}
+                      disabled={formDisabled}
                     />
+
+                    <p className="text-xs text-(--ink-soft)">
+                      Top-up is added directly to this goal wallet and does not deduct other wallets.
+                    </p>
 
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="submit"
-                        disabled={formDisabled || sourceWalletOptions.length === 0}
+                        disabled={formDisabled}
                         className="rounded-xl bg-(--accent) px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Top-up
@@ -379,12 +352,6 @@ export default function GoalsPage() {
                         Cancel
                       </button>
                     </div>
-
-                    {sourceWalletOptions.length === 0 ? (
-                      <p className="text-xs text-(--warning)">
-                        No source wallet available. Add another wallet to top up this goal.
-                      </p>
-                    ) : null}
                   </form>
                 ) : null}
 
