@@ -13,6 +13,12 @@ export default function RoutinePage() {
   const { uid, syncStatus, updateRoutineExpense } = useFinanceAppContext();
   const { dataset, routineCompletion, snapshot } = useFinanceData();
 
+  const livingWallet = dataset.wallets.find(
+    (wallet) => wallet.name.trim().toLowerCase() === "living wallet",
+  );
+  const livingWalletRealBalance = livingWallet?.balance ?? 0;
+  const livingWalletProjectedBalance = livingWalletRealBalance - snapshot.remainingPlannedExpenses;
+
   const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
   const [editPlannedAmount, setEditPlannedAmount] = useState("");
   const [editStatus, setEditStatus] = useState<"planned" | "done">("planned");
@@ -86,15 +92,21 @@ export default function RoutinePage() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <article className="metric-card">
           <p className="stat-label">Real Balance</p>
-          <p className="mt-1 text-lg font-semibold">{formatCurrency(snapshot.totalBalance)}</p>
-          <p className="mt-1 text-xs text-(--ink-muted)">Current balance across wallets.</p>
+          <p className="mt-1 text-lg font-semibold">{formatCurrency(livingWalletRealBalance)}</p>
+          <p className="mt-1 text-xs text-(--ink-muted)">
+            {livingWallet
+              ? "Current balance in Living Wallet."
+              : "Living Wallet not found. Add a wallet named Living Wallet."}
+          </p>
         </article>
         <article className="metric-card">
           <p className="stat-label">Projected Balance</p>
           <p className="mt-1 text-lg font-semibold text-(--warning)">
-            {formatCurrency(snapshot.projectedBalance)}
+            {formatCurrency(livingWalletProjectedBalance)}
           </p>
-          <p className="mt-1 text-xs text-(--ink-muted)">Estimated balance after planned routines.</p>
+          <p className="mt-1 text-xs text-(--ink-muted)">
+            Estimated Living Wallet balance after planned routines.
+          </p>
         </article>
       </div>
 

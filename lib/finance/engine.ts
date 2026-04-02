@@ -172,7 +172,9 @@ export function calculateFinanceSnapshot({
     return sum + Math.max(0, walletBalance ?? 0);
   }, 0);
 
-  const availableMoney = Math.max(0, spendingLimitSourceBalance - spendingLimitExpenses);
+  // Wallet balances are already net of recorded transactions, so subtracting monthly
+  // expenses again would double-count outflows and understate available funds.
+  const availableMoney = Math.max(0, spendingLimitSourceBalance);
   const normalizedStrictSavingsRate = clamp(
     strictSavingsRate,
     MIN_STRICT_SAVINGS_RATE,

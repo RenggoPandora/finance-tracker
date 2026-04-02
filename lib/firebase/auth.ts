@@ -3,7 +3,6 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   getRedirectResult,
-  inMemoryPersistence,
   onAuthStateChanged,
   setPersistence,
   signInWithRedirect,
@@ -15,6 +14,9 @@ import { isFirebaseConfigured, requireAuth } from "@/lib/firebase/client";
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
+
+const AUTH_PERSISTENCE_ERROR =
+  "Browser blocks secure session storage for Google sign-in. Disable private mode and allow cookies, then try again.";
 
 export function subscribeToAuthState(
   callback: (user: User | null) => void,
@@ -39,10 +41,16 @@ async function setBestAuthPersistence(auth: Auth): Promise<void> {
     await setPersistence(auth, browserSessionPersistence);
     return;
   } catch {
-    // Fall through to in-memory persistence.
+    throw new Error(AUTH_PERSISTENCE_ERROR);
+  }
+}
+
+export async function ensureAuthPersistence(): Promise<void> {
+  if (!isFirebaseConfigured) {
+    return;
   }
 
-  await setPersistence(auth, inMemoryPersistence);
+  await setBestAuthPersistence(requireAuth());
 }
 
 export async function resolveRedirectSignInResult(): Promise<User | null> {
@@ -50,7 +58,9 @@ export async function resolveRedirectSignInResult(): Promise<User | null> {
     return null;
   }
 
-  const result = await getRedirectResult(requireAuth());
+  const auth = requireAuth();
+  await setBestAuthPersistence(auth);
+  const result = await getRedirectResult(auth);
   return result?.user ?? null;
 }
 

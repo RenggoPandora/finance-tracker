@@ -267,7 +267,7 @@ export default function DashboardPage() {
             {formatCurrency(snapshot.availableMoney)}
           </p>
           <p className="mt-1 text-xs text-(--ink-muted) sm:text-sm">
-            Living funds minus expenses from source wallets.
+            Current living funds from spending source wallets.
           </p>
         </article>
         <article className="metric-card">

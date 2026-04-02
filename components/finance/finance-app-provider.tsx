@@ -11,6 +11,7 @@ import {
 } from "react";
 import { type User } from "firebase/auth";
 import {
+  ensureAuthPersistence,
   resolveRedirectSignInResult,
   signInWithGoogle,
   signOutCurrentUser,
@@ -182,69 +183,99 @@ export function FinanceAppProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       return;
     }
+
     let isDisposed = false;
+    let hasResolvedRedirect = false;
+    let hasResolvedAuthState = false;
+
     const timeoutId = window.setTimeout(() => {
       if (isDisposed) {
         return;
       }
 
-      setAuthReady((current) => {
+      setAuthReady(true);
+      setAuthError((current) => {
         if (current) {
           return current;
         }
 
-        setAuthError(
-          "Authentication is taking longer than expected. Please try sign-in again.",
-        );
-        return true;
+        return "Authentication is taking longer than expected. Please try sign-in again.";
       });
     }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
+    const finishBootstrap = () => {
+      if (isDisposed || !hasResolvedRedirect || !hasResolvedAuthState) {
+        return;
+      }
+
+      window.clearTimeout(timeoutId);
+      setAuthReady(true);
+    };
 
     let unsubscribeAuth: () => void = () => undefined;
 
     try {
-      void resolveRedirectSignInResult().catch((error) => {
+      void ensureAuthPersistence().catch((error) => {
         if (isDisposed) {
           return;
         }
 
         const message =
-          error instanceof Error ? error.message : "Failed to complete Google sign-in redirect.";
+          error instanceof Error ? error.message : "Failed to prepare browser auth session.";
         setAuthError(message);
       });
+
       unsubscribeAuth = subscribeToAuthState((nextUser) => {
         if (isDisposed) {
           return;
         }
 
-        window.clearTimeout(timeoutId);
         setAuthUser(nextUser);
-        setAuthReady(true);
-        setAuthError(null);
+
+        if (nextUser) {
+          setAuthError(null);
+        }
 
         if (!nextUser) {
           clearUser();
-          return;
+        } else {
+          activateUser(nextUser.uid, createEmptyFinanceDataset());
+
+          void (async () => {
+            try {
+              await upsertUserProfile(nextUser.uid, {
+                uid: nextUser.uid,
+                email: nextUser.email,
+                displayName: nextUser.displayName,
+                photoURL: nextUser.photoURL,
+              });
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Failed to initialize Firebase profile.";
+              setAuthError(message);
+              setSyncStatus("error", message);
+            }
+          })();
         }
 
-        activateUser(nextUser.uid, createEmptyFinanceDataset());
-
-        void (async () => {
-          try {
-            await upsertUserProfile(nextUser.uid, {
-              uid: nextUser.uid,
-              email: nextUser.email,
-              displayName: nextUser.displayName,
-              photoURL: nextUser.photoURL,
-            });
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : "Failed to initialize Firebase profile.";
-            setAuthError(message);
-            setSyncStatus("error", message);
-          }
-        })();
+        hasResolvedAuthState = true;
+        finishBootstrap();
       });
+
+      void resolveRedirectSignInResult()
+        .catch((error) => {
+          if (isDisposed) {
+            return;
+          }
+
+          const message =
+            error instanceof Error ? error.message : "Failed to complete Google sign-in redirect.";
+          setAuthError(message);
+        })
+        .finally(() => {
+          hasResolvedRedirect = true;
+          finishBootstrap();
+        });
     } catch (error) {
       window.clearTimeout(timeoutId);
       const message =
