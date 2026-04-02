@@ -13,10 +13,13 @@ export default function RoutinePage() {
   const { uid, syncStatus, updateRoutineExpense } = useFinanceAppContext();
   const { dataset, routineCompletion, snapshot } = useFinanceData();
 
-  const livingWallet = dataset.wallets.find(
-    (wallet) => wallet.name.trim().toLowerCase() === "living wallet",
+  const livingSourceWallets = dataset.wallets.filter((wallet) => wallet.isSpendingLimitSource);
+  const hasLivingSourceSelection = livingSourceWallets.length > 0;
+  const livingBalanceWallets = hasLivingSourceSelection ? livingSourceWallets : dataset.wallets;
+  const livingWalletRealBalance = livingBalanceWallets.reduce(
+    (sum, wallet) => sum + wallet.balance,
+    0,
   );
-  const livingWalletRealBalance = livingWallet?.balance ?? 0;
   const livingWalletProjectedBalance = livingWalletRealBalance - snapshot.remainingPlannedExpenses;
 
   const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
@@ -94,9 +97,9 @@ export default function RoutinePage() {
           <p className="stat-label">Real Balance</p>
           <p className="mt-1 text-lg font-semibold">{formatCurrency(livingWalletRealBalance)}</p>
           <p className="mt-1 text-xs text-(--ink-muted)">
-            {livingWallet
-              ? "Current balance in Living Wallet."
-              : "Living Wallet not found. Add a wallet named Living Wallet."}
+            {hasLivingSourceSelection
+              ? `Current balance across ${livingSourceWallets.length} living wallet(s).`
+              : "No living wallet selected. Using all wallet balances."}
           </p>
         </article>
         <article className="metric-card">
